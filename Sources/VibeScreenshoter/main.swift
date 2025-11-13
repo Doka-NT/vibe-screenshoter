@@ -1,4 +1,5 @@
 import Cocoa
+import VibeScreenshoterLib
 
 // Main entry point
 let app = NSApplication.shared

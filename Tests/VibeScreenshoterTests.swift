@@ -1,5 +1,5 @@
 import XCTest
-@testable import VibeScreenshoter
+@testable import VibeScreenshoterLib
 
 final class VibeScreenshoterTests: XCTestCase {
     

@@ -13,14 +13,19 @@ let package = Package(
         )
     ],
     targets: [
+        .target(
+            name: "VibeScreenshoterLib",
+            dependencies: [],
+            path: "Sources/VibeScreenshoterLib"
+        ),
         .executableTarget(
             name: "VibeScreenshoter",
-            dependencies: [],
-            path: "Sources"
+            dependencies: ["VibeScreenshoterLib"],
+            path: "Sources/VibeScreenshoter"
         ),
         .testTarget(
             name: "VibeScreenshoterTests",
-            dependencies: ["VibeScreenshoter"],
+            dependencies: ["VibeScreenshoterLib"],
             path: "Tests"
         )
     ]

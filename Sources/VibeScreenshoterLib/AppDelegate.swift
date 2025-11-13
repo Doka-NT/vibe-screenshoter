@@ -1,12 +1,15 @@
 import Cocoa
 
-@main
-class AppDelegate: NSObject, NSApplicationDelegate {
+public class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var screenshotManager: ScreenshotManager?
     var settingsManager: SettingsManager?
     
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    public override init() {
+        super.init()
+    }
+    
+    public func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize managers
         settingsManager = SettingsManager()
         screenshotManager = ScreenshotManager(settingsManager: settingsManager!)
@@ -21,12 +24,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupLaunchAtLogin()
     }
     
-    func applicationWillTerminate(_ notification: Notification) {
+    public func applicationWillTerminate(_ notification: Notification) {
         // Cleanup
         screenshotManager?.cleanup()
     }
     
-    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+    public func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
     }
     
