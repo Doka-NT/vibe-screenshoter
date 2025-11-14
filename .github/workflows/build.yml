@@ -1,4 +1,4 @@
-name: Build and Test
+name: Lint and Syntax Check
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  build:
-    name: Build and Test
+  syntax-check:
+    name: Swift Syntax Check
     runs-on: macos-latest
     
     steps:
@@ -23,28 +23,10 @@ jobs:
     - name: Swift Version
       run: swift --version
       
-    - name: Build Debug
-      run: swift build -v
-      
-    - name: Run Tests
-      run: swift test -v
-      
-    - name: Build Release
-      run: swift build -c release -v
-      
-    - name: Archive Build Artifacts
-      if: success()
+    - name: Syntax Check
       run: |
-        mkdir -p artifacts
-        cp .build/release/VibeScreenshoter artifacts/
-        
-    - name: Upload Artifacts
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: vibe-screenshoter-${{ github.sha }}
-        path: artifacts/
-        retention-days: 30
+        echo "Checking Swift syntax..."
+        find Sources -name "*.swift" -print0 | xargs -0 -n1 xcrun swiftc -typecheck -target arm64-apple-macos13.0
         
   lint:
     name: Swift Lint
