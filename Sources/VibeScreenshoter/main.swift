@@ -9,4 +9,4 @@ app.delegate = delegate
 // Make app an agent (LSUIElement = YES) - runs without dock icon
 app.setActivationPolicy(.accessory)
 
-_ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
+app.run()
