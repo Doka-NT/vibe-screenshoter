@@ -10,7 +10,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private var textButton: NSToolbarItem!
     private var rectangleButton: NSToolbarItem!
     private var arrowButton: NSToolbarItem!
-    private var blurButton: NSToolbarItem!
+    private var redactionButton: NSToolbarItem!
     
     convenience init(image: NSImage, saveHandler: @escaping (NSImage) -> Void, cancelHandler: @escaping () -> Void) {
         // Create window
@@ -53,52 +53,28 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     
     // MARK: - EditorCanvasDelegate
     
-    func canvasNeedsTextInput(at point: NSPoint) {
-        let alert = NSAlert()
-        alert.messageText = "Добавить текст"
-        alert.informativeText = "Введите текст для аннотации:"
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Отмена")
-        
-        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        textField.placeholderString = "Текст..."
-        alert.accessoryView = textField
-        
-        alert.beginSheetModal(for: window!) { response in
-            if response == .alertFirstButtonReturn {
-                let text = textField.stringValue
-                if !text.isEmpty {
-                    self.canvasView.addTextAnnotation(text: text, at: point)
-                }
-            }
-        }
-        
-        // Focus the text field
-        DispatchQueue.main.async {
-            textField.becomeFirstResponder()
-        }
-    }
+    // No longer needed for text input as it's handled inline
     
     // MARK: - Toolbar Actions
     
     @objc private func selectTextTool() {
         canvasView.currentTool = .text
-        updateToolbarSelection()
+        updateToolbarSelection(identifier: NSToolbarItem.Identifier("text"))
     }
     
     @objc private func selectRectangleTool() {
         canvasView.currentTool = .rectangle
-        updateToolbarSelection()
+        updateToolbarSelection(identifier: NSToolbarItem.Identifier("rectangle"))
     }
     
     @objc private func selectArrowTool() {
         canvasView.currentTool = .arrow
-        updateToolbarSelection()
+        updateToolbarSelection(identifier: NSToolbarItem.Identifier("arrow"))
     }
     
-    @objc private func selectBlurTool() {
-        canvasView.currentTool = .blur
-        updateToolbarSelection()
+    @objc private func selectRedactionTool() {
+        canvasView.currentTool = .redaction
+        updateToolbarSelection(identifier: NSToolbarItem.Identifier("redaction"))
     }
     
     @objc private func saveImage() {
@@ -119,9 +95,8 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         window?.close()
     }
     
-    private func updateToolbarSelection() {
-        // Visual feedback for selected tool could be added here
-        // For now, just update cursor or status
+    private func updateToolbarSelection(identifier: NSToolbarItem.Identifier) {
+        toolbar.selectedItemIdentifier = identifier
     }
 }
 
@@ -164,15 +139,15 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             arrowButton = item
             return item
             
-        case "blur":
+        case "redaction":
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Размытие"
-            item.paletteLabel = "Размытие"
-            item.toolTip = "Размыть область"
-            item.image = NSImage(systemSymbolName: "eye.slash", accessibilityDescription: "Blur")
+            item.label = "Скрыть"
+            item.paletteLabel = "Скрыть область"
+            item.toolTip = "Скрыть выбранную область"
+            item.image = NSImage(systemSymbolName: "eye.slash.fill", accessibilityDescription: "Redaction")
             item.target = self
-            item.action = #selector(selectBlurTool)
-            blurButton = item
+            item.action = #selector(selectRedactionTool)
+            redactionButton = item
             return item
             
         case "save":
@@ -205,7 +180,7 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             NSToolbarItem.Identifier("text"),
             NSToolbarItem.Identifier("rectangle"),
             NSToolbarItem.Identifier("arrow"),
-            NSToolbarItem.Identifier("blur"),
+            NSToolbarItem.Identifier("redaction"),
             .flexibleSpace,
             NSToolbarItem.Identifier("save"),
             NSToolbarItem.Identifier("cancel")
@@ -215,13 +190,21 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         return toolbarDefaultItemIdentifiers(toolbar)
     }
+    
+    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        return [
+            NSToolbarItem.Identifier("text"),
+            NSToolbarItem.Identifier("rectangle"),
+            NSToolbarItem.Identifier("arrow"),
+            NSToolbarItem.Identifier("redaction")
+        ]
+    }
 }
 
 // MARK: - NSToolbarItemValidation
 
 extension ScreenshotEditorWindow: NSToolbarItemValidation {
     func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
-        print("Validating toolbar item: \(item.itemIdentifier.rawValue)")
         return true
     }
 }
@@ -230,26 +213,6 @@ extension ScreenshotEditorWindow: NSToolbarItemValidation {
 
 extension ScreenshotEditorWindow: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        // If user closes window via close button, treat as cancel
-        // We check if handlers are still set (they might be nilled out if we closed programmatically, 
-        // but here we just call cancelHandler which is safe to call multiple times if we designed it that way,
-        // or we can rely on the fact that if we saved, we probably closed the window ourselves).
-        
-        // Actually, to be safe, we should just call cancelHandler here.
-        // If we saved, we should have probably nilled out the handlers or set a flag.
-        // But for now, let's just assume if the window is closing and we didn't trigger save, it's a cancel.
-        
-        // A simple way is to check if the window is visible? No, it's closing.
-        // Let's just call cancelHandler. The AppDelegate implementation of cancelHandler
-        // removes the editor and cleans up temp file.
-        // If we already saved, the temp file is gone.
-        // But wait, if we saved, we don't want to call cancelHandler because that might imply "user cancelled".
-        // Although for cleanup purposes it's fine.
-        
-        // Better approach:
-        // In saveImage/cancelEditing, we can set handlers to nil after calling them.
-        // Then here we check if cancelHandler is non-nil.
-        
         cancelHandler?()
     }
 }

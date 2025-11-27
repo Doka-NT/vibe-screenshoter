@@ -4,6 +4,7 @@ import Cocoa
 protocol Annotation {
     var id: UUID { get }
     func draw()
+    func hitTest(point: NSPoint) -> Bool
 }
 
 // MARK: - Text Annotation
@@ -27,6 +28,15 @@ class TextAnnotation: Annotation {
             .foregroundColor: color
         ]
         text.draw(at: position, withAttributes: attributes)
+    }
+    
+    func hitTest(point: NSPoint) -> Bool {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font
+        ]
+        let size = text.size(withAttributes: attributes)
+        let rect = NSRect(origin: position, size: size)
+        return rect.contains(point)
     }
 }
 
@@ -56,6 +66,12 @@ class RectangleAnnotation: Annotation {
         strokeColor.setStroke()
         path.lineWidth = lineWidth
         path.stroke()
+    }
+    
+    func hitTest(point: NSPoint) -> Bool {
+        // Simple bounding box check for now
+        // For hollow rectangles, we might want to check the border, but for simplicity:
+        return rect.contains(point)
     }
 }
 
@@ -111,48 +127,35 @@ class ArrowAnnotation: Annotation {
         arrowPath.lineWidth = lineWidth
         arrowPath.stroke()
     }
+    
+    func hitTest(point: NSPoint) -> Bool {
+        // Hit testing a line is a bit more complex, using a simple bounding box for now
+        let minX = min(startPoint.x, endPoint.x) - 10
+        let minY = min(startPoint.y, endPoint.y) - 10
+        let width = abs(endPoint.x - startPoint.x) + 20
+        let height = abs(endPoint.y - startPoint.y) + 20
+        let rect = NSRect(x: minX, y: minY, width: width, height: height)
+        return rect.contains(point)
+    }
 }
 
-// MARK: - Blur Annotation
-class BlurAnnotation: Annotation {
+// MARK: - Redaction Annotation
+class RedactionAnnotation: Annotation {
     let id = UUID()
     var rect: NSRect
-    var blurRadius: CGFloat
-    var image: NSImage?
     
-    init(rect: NSRect, blurRadius: CGFloat = 50.0) {
+    init(rect: NSRect) {
         self.rect = rect
-        self.blurRadius = blurRadius
     }
     
     func draw() {
-        guard let image = image else { return }
-        
-        // Create a blurred version of the area
-        let ciImage = CIImage(data: image.tiffRepresentation!)
-        let filter = CIFilter(name: "CIGaussianBlur")
-        filter?.setValue(ciImage, forKey: kCIInputImageKey)
-        filter?.setValue(blurRadius, forKey: kCIInputRadiusKey)
-        
-        if let outputImage = filter?.outputImage {
-            let rep = NSCIImageRep(ciImage: outputImage)
-            let blurredImage = NSImage(size: rep.size)
-            blurredImage.addRepresentation(rep)
-            
-            // Draw the blurred image in the rect
-            blurredImage.draw(in: rect)
-        }
+        NSColor.black.setFill()
+        let path = NSBezierPath(rect: rect)
+        path.fill()
     }
     
-    func setImageFromRect(sourceImage: NSImage, sourceRect: NSRect) {
-        // Extract the portion of the image that needs to be blurred
-        let croppedImage = NSImage(size: sourceRect.size)
-        croppedImage.lockFocus()
-        
-        let destRect = NSRect(origin: .zero, size: sourceRect.size)
-        sourceImage.draw(in: destRect, from: sourceRect, operation: .copy, fraction: 1.0)
-        
-        croppedImage.unlockFocus()
-        self.image = croppedImage
+    func hitTest(point: NSPoint) -> Bool {
+        return rect.contains(point)
     }
 }
+
