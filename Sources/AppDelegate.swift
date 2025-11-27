@@ -3,6 +3,8 @@ import Cocoa
 class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
     var statusItem: NSStatusItem!
     var settingsWindowController: NSWindowController?
+    var captureScreenMenuItem: NSMenuItem!
+    var captureSelectionMenuItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Create the status item
@@ -25,19 +27,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
         // Build the menu
         let menu = NSMenu()
         
-        let captureScreenItem = NSMenuItem(title: "Снимок экрана", action: #selector(captureScreen), keyEquivalent: "1")
-        let captureSelectionItem = NSMenuItem(title: "Снимок области", action: #selector(captureSelection), keyEquivalent: "2")
+        captureScreenMenuItem = NSMenuItem(title: "Снимок экрана", action: #selector(captureScreen), keyEquivalent: "")
+        captureSelectionMenuItem = NSMenuItem(title: "Снимок области", action: #selector(captureSelection), keyEquivalent: "")
         let preferencesItem = NSMenuItem(title: "Настройки...", action: #selector(openPreferences), keyEquivalent: ",")
         let quitItem = NSMenuItem(title: "Выход", action: #selector(quit), keyEquivalent: "q")
         
-        menu.addItem(captureScreenItem)
-        menu.addItem(captureSelectionItem)
+        menu.addItem(captureScreenMenuItem)
+        menu.addItem(captureSelectionMenuItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(preferencesItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(quitItem)
         
         statusItem.menu = menu
+        
+        // Update menu shortcuts based on current settings
+        updateMenuShortcuts()
         
         // Initialize HotKey Manager
         HotKeyManager.shared.delegate = self
@@ -60,7 +65,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
         let filePath = generateScreenshotPath()
         // Run asynchronously
         DispatchQueue.global(qos: .userInitiated).async {
-            self.runScreenCapture(arguments: [filePath])
+            // -t png: Use PNG format for lossless quality
+            // -T 0: Disable shadow/border effects
+            self.runScreenCapture(arguments: ["-t", "png", "-T", "0", filePath])
         }
     }
 
@@ -69,7 +76,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
         let filePath = generateScreenshotPath()
         // Run asynchronously
         DispatchQueue.global(qos: .userInitiated).async {
-            self.runScreenCapture(arguments: ["-i", filePath])
+            // -i: Interactive mode (selection)
+            // -t png: Use PNG format for lossless quality
+            // -T 0: Disable shadow/border effects
+            self.runScreenCapture(arguments: ["-i", "-t", "png", "-T", "0", filePath])
         }
     }
     
@@ -135,5 +145,57 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
         } catch {
             print("Failed to run screencapture: \(error)")
         }
+    }
+    
+    // Update menu items to show current shortcuts
+    func updateMenuShortcuts() {
+        // Update Screen Capture menu item
+        captureScreenMenuItem.title = "Снимок экрана"
+        if let keyCode = SettingsManager.shared.screenShortcutKeyCode,
+           let modifiers = SettingsManager.shared.screenShortcutModifiers,
+           let keyChar = keyCodeToCharacter(keyCode) {
+            
+            // Convert to lowercase for keyEquivalent (it expects lowercase)
+            captureScreenMenuItem.keyEquivalent = keyChar.lowercased()
+            captureScreenMenuItem.keyEquivalentModifierMask = NSEvent.ModifierFlags(rawValue: modifiers)
+        } else {
+            captureScreenMenuItem.keyEquivalent = ""
+            captureScreenMenuItem.keyEquivalentModifierMask = []
+        }
+        
+        // Update Selection Capture menu item
+        captureSelectionMenuItem.title = "Снимок области"
+        if let keyCode = SettingsManager.shared.selectionShortcutKeyCode,
+           let modifiers = SettingsManager.shared.selectionShortcutModifiers,
+           let keyChar = keyCodeToCharacter(keyCode) {
+            
+            captureSelectionMenuItem.keyEquivalent = keyChar.lowercased()
+            captureSelectionMenuItem.keyEquivalentModifierMask = NSEvent.ModifierFlags(rawValue: modifiers)
+        } else {
+            captureSelectionMenuItem.keyEquivalent = ""
+            captureSelectionMenuItem.keyEquivalentModifierMask = []
+        }
+    }
+    
+    // Convert key code to character representation
+    private func keyCodeToCharacter(_ keyCode: UInt16) -> String? {
+        // Common key codes mapping
+        let keyMap: [UInt16: String] = [
+            0: "A", 1: "S", 2: "D", 3: "F", 4: "H", 5: "G", 6: "Z", 7: "X",
+            8: "C", 9: "V", 11: "B", 12: "Q", 13: "W", 14: "E", 15: "R",
+            16: "Y", 17: "T", 18: "1", 19: "2", 20: "3", 21: "4", 22: "6",
+            23: "5", 24: "=", 25: "9", 26: "7", 27: "-", 28: "8", 29: "0",
+            30: "]", 31: "O", 32: "U", 33: "[", 34: "I", 35: "P", 37: "L",
+            38: "J", 39: "'", 40: "K", 41: ";", 42: "\\", 43: ",", 44: "/",
+            45: "N", 46: "M", 47: ".", 50: "`",
+            // Function keys
+            122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5", 97: "F6",
+            98: "F7", 100: "F8", 101: "F9", 109: "F10", 103: "F11", 111: "F12",
+            // Special keys
+            36: "↩", 48: "⇥", 49: "Space", 51: "⌫", 53: "⎋",
+            123: "←", 124: "→", 125: "↓", 126: "↑"
+        ]
+        
+        return keyMap[keyCode]
     }
 }

@@ -290,6 +290,11 @@ class SettingsViewController: NSViewController {
             HotKeyManager.shared.register(id: 2, keyCode: event.keyCode, modifiers: flags.rawValue)
         }
         
+        // Update the menu bar to show the new shortcuts
+        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+            appDelegate.updateMenuShortcuts()
+        }
+        
         endRecording()
     }
     
