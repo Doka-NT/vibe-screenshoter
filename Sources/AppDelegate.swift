@@ -62,24 +62,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
 
     @objc func captureScreen() {
         print("Capture Screen action triggered")
-        let filePath = generateScreenshotPath()
+        let finalPath = generateScreenshotPath()
+        let tempPath = generateTempScreenshotPath()
+        
         // Run asynchronously
         DispatchQueue.global(qos: .userInitiated).async {
             // -t png: Use PNG format for lossless quality
             // -T 0: Disable shadow/border effects
-            self.runScreenCapture(arguments: ["-t", "png", "-T", "0", filePath])
+            self.runScreenCapture(arguments: ["-t", "png", "-T", "0", tempPath])
+            
+            // Open editor on main thread after capture
+            DispatchQueue.main.async {
+                self.openEditor(tempImagePath: tempPath, finalSavePath: finalPath)
+            }
         }
     }
 
     @objc func captureSelection() {
         print("Capture Selection action triggered")
-        let filePath = generateScreenshotPath()
+        let finalPath = generateScreenshotPath()
+        let tempPath = generateTempScreenshotPath()
+        
         // Run asynchronously
         DispatchQueue.global(qos: .userInitiated).async {
             // -i: Interactive mode (selection)
             // -t png: Use PNG format for lossless quality
             // -T 0: Disable shadow/border effects
-            self.runScreenCapture(arguments: ["-i", "-t", "png", "-T", "0", filePath])
+            self.runScreenCapture(arguments: ["-i", "-t", "png", "-T", "0", tempPath])
+            
+            // Open editor on main thread after capture
+            DispatchQueue.main.async {
+                self.openEditor(tempImagePath: tempPath, finalSavePath: finalPath)
+            }
         }
     }
     
@@ -121,6 +135,72 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
         
         let saveDir = SettingsManager.shared.saveLocation
         return saveDir.appendingPathComponent("Screenshot \(dateString).png").path
+    }
+    
+    func generateTempScreenshotPath() -> String {
+        let tempDir = NSTemporaryDirectory()
+        let timestamp = Date().timeIntervalSince1970
+        return (tempDir as NSString).appendingPathComponent("screenshot_temp_\(timestamp).png")
+    }
+    
+    var activeEditors: [ScreenshotEditorWindow] = []
+
+    func openEditor(tempImagePath: String, finalSavePath: String) {
+        // Load the captured image
+        guard let image = NSImage(contentsOfFile: tempImagePath) else {
+            print("Failed to load captured image from: \(tempImagePath)")
+            return
+        }
+        
+        // Create editor window
+        // We need to declare editor first to capture it in closures, but we can't initialize it without closures.
+        // So we use a little dance or just use `self` to manage the list.
+        
+        var editor: ScreenshotEditorWindow!
+        
+        editor = ScreenshotEditorWindow(
+            image: image,
+            saveHandler: { [weak self] finalImage in
+                self?.saveEditedImage(finalImage, to: finalSavePath)
+                self?.cleanupTempFile(tempImagePath)
+                if let index = self?.activeEditors.firstIndex(of: editor) {
+                    self?.activeEditors.remove(at: index)
+                }
+            },
+            cancelHandler: { [weak self] in
+                print("Editing cancelled")
+                self?.cleanupTempFile(tempImagePath)
+                if let index = self?.activeEditors.firstIndex(of: editor) {
+                    self?.activeEditors.remove(at: index)
+                }
+            }
+        )
+        
+        // Add to active editors to retain it
+        activeEditors.append(editor)
+        
+        editor.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    func saveEditedImage(_ image: NSImage, to path: String) {
+        guard let tiffData = image.tiffRepresentation,
+              let bitmapImage = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmapImage.representation(using: .png, properties: [:]) else {
+            print("Failed to convert image to PNG")
+            return
+        }
+        
+        do {
+            try pngData.write(to: URL(fileURLWithPath: path))
+            print("Screenshot saved to: \(path)")
+        } catch {
+            print("Failed to save screenshot: \(error)")
+        }
+    }
+    
+    func cleanupTempFile(_ path: String) {
+        try? FileManager.default.removeItem(atPath: path)
     }
     
     func runScreenCapture(arguments: [String]) {
