@@ -13,9 +13,21 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private var redactionButton: NSToolbarItem!
     
     convenience init(image: NSImage, saveHandler: @escaping (NSImage) -> Void, cancelHandler: @escaping () -> Void) {
+        // Adjust image size for Retina displays if needed
+        // screencapture returns an image where size == pixels (72 DPI), but on Retina we want size == pixels / scale
+        var displayImage = image
+        if let screen = NSScreen.main {
+            let scale = screen.backingScaleFactor
+            if scale > 1.0 {
+                let newSize = NSSize(width: CGFloat(image.representations[0].pixelsWide) / scale,
+                                   height: CGFloat(image.representations[0].pixelsHigh) / scale)
+                displayImage.size = newSize
+            }
+        }
+
         // Create window
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: image.size.width, height: image.size.height),
+            contentRect: NSRect(x: 0, y: 0, width: displayImage.size.width, height: displayImage.size.height),
             styleMask: [.titled, .closable, .miniaturizable], // Removed .resizable
             backing: .buffered,
             defer: false
@@ -28,7 +40,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         self.saveHandler = saveHandler
         self.cancelHandler = cancelHandler
         
-        setupCanvasView(with: image)
+        setupCanvasView(with: displayImage)
         setupToolbar()
         
         // Set window delegate to handle close button
@@ -47,7 +59,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private func setupToolbar() {
         toolbar = NSToolbar(identifier: "EditorToolbar")
         toolbar.delegate = self
-        toolbar.displayMode = .iconAndLabel
+        toolbar.displayMode = .iconOnly
         window?.toolbar = toolbar
     }
     
@@ -98,6 +110,12 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private func updateToolbarSelection(identifier: NSToolbarItem.Identifier) {
         toolbar.selectedItemIdentifier = identifier
     }
+    
+    private func createToolbarIcon(systemName: String, accessibilityDescription: String) -> NSImage? {
+        let config = NSImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        let image = NSImage(systemSymbolName: systemName, accessibilityDescription: accessibilityDescription)
+        return image?.withSymbolConfiguration(config)
+    }
 }
 
 // MARK: - NSToolbarDelegate
@@ -111,7 +129,7 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             item.label = "Текст"
             item.paletteLabel = "Текст"
             item.toolTip = "Добавить текст"
-            item.image = NSImage(systemSymbolName: "textformat", accessibilityDescription: "Text")
+            item.image = createToolbarIcon(systemName: "textformat", accessibilityDescription: "Text")
             item.target = self
             item.action = #selector(selectTextTool)
             textButton = item
@@ -122,7 +140,7 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             item.label = "Прямоугольник"
             item.paletteLabel = "Прямоугольник"
             item.toolTip = "Нарисовать прямоугольник"
-            item.image = NSImage(systemSymbolName: "rectangle", accessibilityDescription: "Rectangle")
+            item.image = createToolbarIcon(systemName: "rectangle", accessibilityDescription: "Rectangle")
             item.target = self
             item.action = #selector(selectRectangleTool)
             rectangleButton = item
@@ -133,7 +151,7 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             item.label = "Стрелка"
             item.paletteLabel = "Стрелка"
             item.toolTip = "Нарисовать стрелку"
-            item.image = NSImage(systemSymbolName: "arrow.up.right", accessibilityDescription: "Arrow")
+            item.image = createToolbarIcon(systemName: "arrow.up.right", accessibilityDescription: "Arrow")
             item.target = self
             item.action = #selector(selectArrowTool)
             arrowButton = item
@@ -144,7 +162,7 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             item.label = "Скрыть"
             item.paletteLabel = "Скрыть область"
             item.toolTip = "Скрыть выбранную область"
-            item.image = NSImage(systemSymbolName: "eye.slash.fill", accessibilityDescription: "Redaction")
+            item.image = createToolbarIcon(systemName: "eye.slash.fill", accessibilityDescription: "Redaction")
             item.target = self
             item.action = #selector(selectRedactionTool)
             redactionButton = item
@@ -155,7 +173,7 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             item.label = "Сохранить"
             item.paletteLabel = "Сохранить"
             item.toolTip = "Сохранить скриншот"
-            item.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Save")
+            item.image = createToolbarIcon(systemName: "checkmark.circle.fill", accessibilityDescription: "Save")
             item.target = self
             item.action = #selector(saveImage)
             return item
@@ -165,7 +183,7 @@ extension ScreenshotEditorWindow: NSToolbarDelegate {
             item.label = "Отмена"
             item.paletteLabel = "Отмена"
             item.toolTip = "Отменить и закрыть"
-            item.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Cancel")
+            item.image = createToolbarIcon(systemName: "xmark.circle.fill", accessibilityDescription: "Cancel")
             item.target = self
             item.action = #selector(cancelEditing)
             return item
