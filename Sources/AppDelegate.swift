@@ -1,7 +1,8 @@
 import Cocoa
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
     var statusItem: NSStatusItem!
+    var settingsWindowController: NSWindowController?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Create the status item
@@ -26,14 +27,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         let captureScreenItem = NSMenuItem(title: "Снимок экрана", action: #selector(captureScreen), keyEquivalent: "1")
         let captureSelectionItem = NSMenuItem(title: "Снимок области", action: #selector(captureSelection), keyEquivalent: "2")
+        let preferencesItem = NSMenuItem(title: "Настройки...", action: #selector(openPreferences), keyEquivalent: ",")
         let quitItem = NSMenuItem(title: "Выход", action: #selector(quit), keyEquivalent: "q")
         
         menu.addItem(captureScreenItem)
         menu.addItem(captureSelectionItem)
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(preferencesItem)
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(quitItem)
         
         statusItem.menu = menu
+        
+        // Initialize HotKey Manager
+        HotKeyManager.shared.delegate = self
+        
+        // Register screen shortcut (ID: 1)
+        if let code = SettingsManager.shared.screenShortcutKeyCode,
+           let mods = SettingsManager.shared.screenShortcutModifiers {
+            HotKeyManager.shared.register(id: 1, keyCode: code, modifiers: mods)
+        }
+        
+        // Register selection shortcut (ID: 2)
+        if let code = SettingsManager.shared.selectionShortcutKeyCode,
+           let mods = SettingsManager.shared.selectionShortcutModifiers {
+            HotKeyManager.shared.register(id: 2, keyCode: code, modifiers: mods)
+        }
     }
 
     @objc func captureScreen() {
@@ -53,10 +72,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.runScreenCapture(arguments: ["-i", filePath])
         }
     }
+    
+    @objc func openPreferences() {
+        if settingsWindowController == nil {
+            let settingsVC = SettingsViewController()
+            let window = NSWindow(contentViewController: settingsVC)
+            window.title = "Preferences"
+            window.styleMask = [.titled, .closable]
+            window.center()
+            settingsWindowController = NSWindowController(window: window)
+        }
+        
+        settingsWindowController?.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
 
     @objc func quit() {
         print("Quit action triggered")
         NSApplication.shared.terminate(nil)
+    }
+    
+    func hotKeyTriggered(id: UInt32) {
+        print("Global HotKey Triggered! ID: \(id)")
+        switch id {
+        case 1:
+            captureScreen()
+        case 2:
+            captureSelection()
+        default:
+            print("Unknown hotkey ID: \(id)")
+        }
     }
     
     func generateScreenshotPath() -> String {
@@ -64,8 +109,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
         let dateString = formatter.string(from: Date())
         
-        let desktopPath = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first?.path ?? "/tmp"
-        return "\(desktopPath)/Screenshot \(dateString).png"
+        let saveDir = SettingsManager.shared.saveLocation
+        return saveDir.appendingPathComponent("Screenshot \(dateString).png").path
     }
     
     func runScreenCapture(arguments: [String]) {
