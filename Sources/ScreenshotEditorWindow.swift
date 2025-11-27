@@ -5,6 +5,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private var toolbar: NSToolbar!
     private var saveHandler: ((NSImage) -> Void)?
     private var cancelHandler: (() -> Void)?
+    private var localEventMonitor: Any?
     
     // Toolbar buttons
     private var textButton: NSToolbarItem!
@@ -45,6 +46,15 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         
         // Set window delegate to handle close button
         window.delegate = self
+        
+        // Setup keyboard shortcut monitor
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.modifierFlags.contains(.command) && event.keyCode == 36 { // 36 is Enter
+                self?.saveImage()
+                return nil
+            }
+            return event
+        }
     }
     
     private func setupCanvasView(with image: NSImage) {
@@ -91,6 +101,11 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     
     @objc private func saveImage() {
         if let finalImage = canvasView.renderFinalImage() {
+            // Save to clipboard
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.writeObjects([finalImage])
+            
             saveHandler?(finalImage)
             // Prevent double-calling handlers in windowWillClose
             saveHandler = nil
@@ -231,6 +246,10 @@ extension ScreenshotEditorWindow: NSToolbarItemValidation {
 
 extension ScreenshotEditorWindow: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            localEventMonitor = nil
+        }
         cancelHandler?()
     }
 }
