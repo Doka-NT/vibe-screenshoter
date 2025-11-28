@@ -1,11 +1,11 @@
 import Cocoa
 
-enum EditorTool {
-    case none
-    case text
-    case rectangle
-    case arrow
-    case redaction
+enum EditorTool: Int {
+    case none = 0
+    case text = 1
+    case rectangle = 2
+    case arrow = 3
+    case redaction = 4
 }
 
 protocol EditorCanvasDelegate: AnyObject {
@@ -17,14 +17,18 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
     
     var screenshotImage: NSImage?
     var annotations: [Annotation] = []
-    var currentTool: EditorTool = .none
+    var currentTool: EditorTool = .none {
+        didSet {
+            print("DEBUG: currentTool changed from \(oldValue) to \(currentTool)")
+        }
+    }
     
     // Temporary drawing state
     private var drawingStartPoint: NSPoint?
     private var drawingCurrentPoint: NSPoint?
     
     // Text editing state
-    private var activeTextView: NSTextView?
+    private var activeTextScrollView: NSScrollView?
     private var editingAnnotation: TextAnnotation?
     
     override var isFlipped: Bool {
@@ -56,7 +60,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
     
     override func mouseDown(with event: NSEvent) {
         // Commit any active text editing first
-        if let textView = activeTextView {
+        if activeTextScrollView != nil {
             endTextEditing()
             // If we clicked outside the text view, we might want to process this click for a new tool
             // But usually committing text absorbs the click. Let's see.
@@ -66,8 +70,11 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         
         let point = convert(event.locationInWindow, from: nil)
         
+        print("DEBUG: mouseDown with currentTool = \(currentTool)")
+        
         switch currentTool {
         case .text:
+            print("DEBUG: Starting text annotation at \(point)")
             // Check if we clicked an existing text annotation
             if let existingText = annotations.compactMap({ $0 as? TextAnnotation }).first(where: { $0.hitTest(point: point) }) {
                 startEditing(annotation: existingText)
@@ -82,6 +89,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
             drawingCurrentPoint = point
             
         case .none:
+            print("DEBUG: Tool is .none, doing nothing")
             break
         }
     }
@@ -184,11 +192,36 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
     // MARK: - Text Editing
     
     private func startNewText(at point: NSPoint) {
-        let textView = NSTextView(frame: NSRect(x: point.x, y: point.y, width: 200, height: 30))
+        print("DEBUG: startNewText called at \(point)")
+        
+        // Create scroll view to contain the text view (required for proper NSTextView operation)
+        let scrollView = NSScrollView(frame: NSRect(x: point.x, y: point.y, width: 200, height: 30))
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        
+        // Create text view
+        let textView = NSTextView(frame: scrollView.bounds)
         setupTextView(textView)
-        self.addSubview(textView)
-        self.activeTextView = textView
-        textView.window?.makeFirstResponder(textView)
+        
+        // Set up the scroll view's document view
+        scrollView.documentView = textView
+        
+        // Add scroll view to canvas
+        self.addSubview(scrollView)
+        self.activeTextScrollView = scrollView
+        
+        print("DEBUG: textView.window = \(String(describing: textView.window))")
+        print("DEBUG: self.window = \(String(describing: self.window))")
+        
+        // Use self.window instead of textView.window to ensure we have the right reference
+        if let window = self.window {
+            window.makeFirstResponder(textView)
+            print("DEBUG: Made textView first responder")
+        } else {
+            print("DEBUG: ERROR - No window found!")
+        }
     }
     
     private func startEditing(annotation: TextAnnotation) {
@@ -201,36 +234,75 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         let size = annotation.text.size(withAttributes: attributes)
         let rect = NSRect(origin: annotation.position, size: NSSize(width: max(size.width + 20, 100), height: max(size.height, 30)))
         
-        let textView = NSTextView(frame: rect)
+        // Create scroll view to contain the text view
+        let scrollView = NSScrollView(frame: rect)
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        
+        // Create text view
+        let textView = NSTextView(frame: scrollView.bounds)
         textView.string = annotation.text
         setupTextView(textView, font: annotation.font, color: annotation.color)
         
-        self.addSubview(textView)
-        self.activeTextView = textView
-        textView.window?.makeFirstResponder(textView)
+        // Set up the scroll view's document view
+        scrollView.documentView = textView
+        
+        self.addSubview(scrollView)
+        self.activeTextScrollView = scrollView
+        self.window?.makeFirstResponder(textView)
         
         // Trigger redraw to hide the annotation being edited
         needsDisplay = true
     }
     
     private func setupTextView(_ textView: NSTextView, font: NSFont = .systemFont(ofSize: 24, weight: .bold), color: NSColor = .red) {
+        // CRITICAL: Make sure the text view is editable and selectable
+        textView.isEditable = true
+        textView.isSelectable = true
+        
+        // Appearance
         textView.font = font
         textView.textColor = color
-        textView.drawsBackground = false
-        textView.backgroundColor = .clear
+        textView.drawsBackground = true
+        textView.backgroundColor = NSColor.white.withAlphaComponent(0.1)
+        textView.insertionPointColor = color
+        
+        // Behavior
         textView.delegate = self
         textView.isRichText = false
+        textView.allowsUndo = true
+        textView.usesFontPanel = false
+        textView.usesRuler = false
+        
+        // Make it auto-resize
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.autoresizingMask = [.width, .height]
+        
+        if let textContainer = textView.textContainer {
+            textContainer.containerSize = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.widthTracksTextView = false
+        }
+        
+        textView.maxSize = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
+        textView.minSize = NSSize(width: 50, height: 30)
+        
+        // Add a visible border for debugging
+        textView.wantsLayer = true
+        textView.layer?.borderColor = NSColor.red.withAlphaComponent(0.5).cgColor
+        textView.layer?.borderWidth = 2.0
+        
+        print("DEBUG: setupTextView - isEditable: \(textView.isEditable), isSelectable: \(textView.isSelectable)")
     }
     
     private func endTextEditing() {
-        guard let textView = activeTextView else { return }
+        guard let scrollView = activeTextScrollView,
+              let textView = scrollView.documentView as? NSTextView else { return }
         
         let text = textView.string
-        let origin = textView.frame.origin
+        let origin = scrollView.frame.origin
         
         if !text.isEmpty {
             if let existing = editingAnnotation {
@@ -250,8 +322,8 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
             }
         }
         
-        textView.removeFromSuperview()
-        activeTextView = nil
+        scrollView.removeFromSuperview()
+        activeTextScrollView = nil
         editingAnnotation = nil
         needsDisplay = true
     }
@@ -270,7 +342,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
     // Render the final image with all annotations
     func renderFinalImage() -> NSImage? {
         // Ensure any active editing is committed
-        if activeTextView != nil {
+        if activeTextScrollView != nil {
             endTextEditing()
         }
         

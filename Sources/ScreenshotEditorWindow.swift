@@ -2,16 +2,10 @@ import Cocoa
 
 class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private var canvasView: EditorCanvasView!
-    private var toolbar: NSToolbar!
+    private var toolPaletteView: ToolPaletteView!
     private var saveHandler: ((NSImage) -> Void)?
     private var cancelHandler: (() -> Void)?
     private var localEventMonitor: Any?
-    
-    // Toolbar buttons
-    private var textButton: NSToolbarItem!
-    private var rectangleButton: NSToolbarItem!
-    private var arrowButton: NSToolbarItem!
-    private var redactionButton: NSToolbarItem!
     
     convenience init(image: NSImage, saveHandler: @escaping (NSImage) -> Void, cancelHandler: @escaping () -> Void) {
         // Adjust image size for Retina displays if needed
@@ -26,14 +20,14 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
             }
         }
 
-        // Create window
-        let window = NSWindow(
+        // Create window without title bar for cleaner look
+        let window = EditorWindow(
             contentRect: NSRect(x: 0, y: 0, width: displayImage.size.width, height: displayImage.size.height),
-            styleMask: [.titled, .closable, .miniaturizable], // Removed .resizable
+            styleMask: [.borderless, .closable],
             backing: .buffered,
             defer: false
         )
-        window.title = "Редактирование скриншота"
+        window.isMovableByWindowBackground = false
         window.center()
         
         self.init(window: window)
@@ -42,13 +36,19 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         self.cancelHandler = cancelHandler
         
         setupCanvasView(with: displayImage)
-        setupToolbar()
+        setupToolPalette()
         
         // Set window delegate to handle close button
         window.delegate = self
         
         // Setup keyboard shortcut monitor
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // Don't intercept events if a text view is first responder (user is typing)
+            if let firstResponder = self?.window?.firstResponder as? NSTextView {
+                print("DEBUG: Text view is first responder, allowing event through")
+                return event
+            }
+            
             if event.modifierFlags.contains(.command) && event.keyCode == 36 { // 36 is Enter
                 self?.saveImage()
                 return nil
@@ -66,38 +66,37 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         window!.contentView = canvasView
     }
     
-    private func setupToolbar() {
-        toolbar = NSToolbar(identifier: "EditorToolbar")
-        toolbar.delegate = self
-        toolbar.displayMode = .iconOnly
-        window?.toolbar = toolbar
+    private func setupToolPalette() {
+        // Create floating tool palette
+        toolPaletteView = ToolPaletteView(frame: .zero)
+        toolPaletteView.onToolSelected = { [weak self] tool in
+            self?.canvasView.currentTool = tool
+        }
+        toolPaletteView.onSave = { [weak self] in
+            self?.saveImage()
+        }
+        toolPaletteView.onCancel = { [weak self] in
+            self?.cancelEditing()
+        }
+        
+        // Set initial tool to text (must be done after callbacks are set)
+        canvasView.currentTool = .text
+        
+        canvasView.addSubview(toolPaletteView)
+        
+        // Position palette at top center
+        toolPaletteView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            toolPaletteView.topAnchor.constraint(equalTo: canvasView.topAnchor, constant: 12),
+            toolPaletteView.centerXAnchor.constraint(equalTo: canvasView.centerXAnchor)
+        ])
     }
     
     // MARK: - EditorCanvasDelegate
     
     // No longer needed for text input as it's handled inline
     
-    // MARK: - Toolbar Actions
-    
-    @objc private func selectTextTool() {
-        canvasView.currentTool = .text
-        updateToolbarSelection(identifier: NSToolbarItem.Identifier("text"))
-    }
-    
-    @objc private func selectRectangleTool() {
-        canvasView.currentTool = .rectangle
-        updateToolbarSelection(identifier: NSToolbarItem.Identifier("rectangle"))
-    }
-    
-    @objc private func selectArrowTool() {
-        canvasView.currentTool = .arrow
-        updateToolbarSelection(identifier: NSToolbarItem.Identifier("arrow"))
-    }
-    
-    @objc private func selectRedactionTool() {
-        canvasView.currentTool = .redaction
-        updateToolbarSelection(identifier: NSToolbarItem.Identifier("redaction"))
-    }
+    // MARK: - Actions
     
     @objc private func saveImage() {
         if let finalImage = canvasView.renderFinalImage() {
@@ -122,124 +121,6 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         window?.close()
     }
     
-    private func updateToolbarSelection(identifier: NSToolbarItem.Identifier) {
-        toolbar.selectedItemIdentifier = identifier
-    }
-    
-    private func createToolbarIcon(systemName: String, accessibilityDescription: String) -> NSImage? {
-        let config = NSImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-        let image = NSImage(systemSymbolName: systemName, accessibilityDescription: accessibilityDescription)
-        return image?.withSymbolConfiguration(config)
-    }
-}
-
-// MARK: - NSToolbarDelegate
-
-extension ScreenshotEditorWindow: NSToolbarDelegate {
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        
-        switch itemIdentifier.rawValue {
-        case "text":
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Текст"
-            item.paletteLabel = "Текст"
-            item.toolTip = "Добавить текст"
-            item.image = createToolbarIcon(systemName: "textformat", accessibilityDescription: "Text")
-            item.target = self
-            item.action = #selector(selectTextTool)
-            textButton = item
-            return item
-            
-        case "rectangle":
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Прямоугольник"
-            item.paletteLabel = "Прямоугольник"
-            item.toolTip = "Нарисовать прямоугольник"
-            item.image = createToolbarIcon(systemName: "rectangle", accessibilityDescription: "Rectangle")
-            item.target = self
-            item.action = #selector(selectRectangleTool)
-            rectangleButton = item
-            return item
-            
-        case "arrow":
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Стрелка"
-            item.paletteLabel = "Стрелка"
-            item.toolTip = "Нарисовать стрелку"
-            item.image = createToolbarIcon(systemName: "arrow.up.right", accessibilityDescription: "Arrow")
-            item.target = self
-            item.action = #selector(selectArrowTool)
-            arrowButton = item
-            return item
-            
-        case "redaction":
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Скрыть"
-            item.paletteLabel = "Скрыть область"
-            item.toolTip = "Скрыть выбранную область"
-            item.image = createToolbarIcon(systemName: "eye.slash.fill", accessibilityDescription: "Redaction")
-            item.target = self
-            item.action = #selector(selectRedactionTool)
-            redactionButton = item
-            return item
-            
-        case "save":
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Сохранить"
-            item.paletteLabel = "Сохранить"
-            item.toolTip = "Сохранить скриншот"
-            item.image = createToolbarIcon(systemName: "checkmark.circle.fill", accessibilityDescription: "Save")
-            item.target = self
-            item.action = #selector(saveImage)
-            return item
-            
-        case "cancel":
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Отмена"
-            item.paletteLabel = "Отмена"
-            item.toolTip = "Отменить и закрыть"
-            item.image = createToolbarIcon(systemName: "xmark.circle.fill", accessibilityDescription: "Cancel")
-            item.target = self
-            item.action = #selector(cancelEditing)
-            return item
-            
-        default:
-            return nil
-        }
-    }
-    
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [
-            NSToolbarItem.Identifier("text"),
-            NSToolbarItem.Identifier("rectangle"),
-            NSToolbarItem.Identifier("arrow"),
-            NSToolbarItem.Identifier("redaction"),
-            .flexibleSpace,
-            NSToolbarItem.Identifier("save"),
-            NSToolbarItem.Identifier("cancel")
-        ]
-    }
-    
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return toolbarDefaultItemIdentifiers(toolbar)
-    }
-    
-    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        return [
-            NSToolbarItem.Identifier("text"),
-            NSToolbarItem.Identifier("rectangle"),
-            NSToolbarItem.Identifier("arrow"),
-            NSToolbarItem.Identifier("redaction")
-        ]
-    }
-}
-
-// MARK: - NSToolbarItemValidation
-
-extension ScreenshotEditorWindow: NSToolbarItemValidation {
-    func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
-        return true
-    }
 }
 
 // MARK: - NSWindowDelegate
@@ -251,5 +132,12 @@ extension ScreenshotEditorWindow: NSWindowDelegate {
             localEventMonitor = nil
         }
         cancelHandler?()
+    }
+}
+
+// Custom window subclass to allow borderless window to become key
+private class EditorWindow: NSWindow {
+    override var canBecomeKey: Bool {
+        return true
     }
 }

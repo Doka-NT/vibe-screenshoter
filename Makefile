@@ -1,5 +1,5 @@
 APP_NAME = MenuBarScreenshotApp
-SOURCES = Sources/main.swift Sources/AppDelegate.swift Sources/SettingsManager.swift Sources/HotKeyManager.swift Sources/SettingsViewController.swift Sources/AnnotationModels.swift Sources/EditorCanvasView.swift Sources/ScreenshotEditorWindow.swift
+SOURCES = Sources/main.swift Sources/AppDelegate.swift Sources/SettingsManager.swift Sources/HotKeyManager.swift Sources/SettingsViewController.swift Sources/AnnotationModels.swift Sources/EditorCanvasView.swift Sources/ScreenshotEditorWindow.swift Sources/ToolPaletteView.swift
 BUILD_DIR = build
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
 CONTENTS_DIR = $(APP_BUNDLE)/Contents
