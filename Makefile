@@ -1,4 +1,4 @@
-APP_NAME = MenuBarScreenshotApp
+APP_NAME = VibeScreenshoter
 SOURCES = Sources/main.swift Sources/AppDelegate.swift Sources/SettingsManager.swift Sources/HotKeyManager.swift Sources/SettingsViewController.swift Sources/AnnotationModels.swift Sources/EditorCanvasView.swift Sources/ScreenshotEditorWindow.swift Sources/ToolPaletteView.swift
 BUILD_DIR = build
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
@@ -13,6 +13,8 @@ $(APP_BUNDLE): $(SOURCES) Info.plist
 	@mkdir -p $(RESOURCES_DIR)
 	swiftc $(SOURCES) -o $(MACOS_DIR)/$(APP_NAME)
 	cp Info.plist $(CONTENTS_DIR)/
+	echo "APPL????" > $(CONTENTS_DIR)/PkgInfo
+	cp AppIcon.icns $(RESOURCES_DIR)/
 	@echo "Built $(APP_NAME).app in $(BUILD_DIR)"
 
 clean:
