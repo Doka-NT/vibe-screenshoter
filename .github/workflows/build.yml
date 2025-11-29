@@ -1,0 +1,37 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build application
+        run: make clean && make
+
+      - name: Create DMG
+        run: |
+          hdiutil create -volname "VibeScreenshoter" -srcfolder build/VibeScreenshoter.app -ov -format UDZO build/VibeScreenshoter.dmg
+
+      - name: Upload App artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeScreenshoter.app
+          path: build/VibeScreenshoter.app
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeScreenshoter.dmg
+          path: build/VibeScreenshoter.dmg
