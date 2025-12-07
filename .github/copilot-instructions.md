@@ -1,6 +1,7 @@
 # Copilot Instructions for vibe-screenshoter
 
 - Purpose: macOS menu-bar screenshot tool; captures via `/usr/sbin/screencapture`, then opens a borderless editor to annotate and save PNGs.
+- Core features: one-click full-screen or region capture from menu or hotkeys; lightweight annotation (text, rectangle, arrow, blackout) in a floating editor; saves PNG to disk and clipboard simultaneously; configurable save directory and global shortcuts via preferences; Russian-localized menu/tooltips for consistency.
 - Build/Run: `make` compiles with `swiftc` into `build/VibeScreenshoter.app`; `make run` opens the app; `make debug` runs the binary from `build/Contents/MacOS`; `make clean` clears the bundle. App expects `AppIcon.icns` beside `Info.plist`.
 - Entry/Status UI: `main.swift` boots `AppDelegate`. `AppDelegate` creates the status-item menu (screen capture, selection capture, preferences, quit) and shows shortcuts pulled from settings.
 - Capture flow: `captureScreen` uses `screencapture -t png -T 0`; `captureSelection` adds `-i` for interactive region. Temp file lives in `/tmp` via `generateTempScreenshotPath`; final path lives under `SettingsManager.saveLocation` (default Desktop) with timestamp naming.
