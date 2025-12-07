@@ -8,7 +8,6 @@ class ToolPaletteView: NSView {
     var onToolSelected: ((EditorTool) -> Void)?
     var onSave: (() -> Void)?
     var onCancel: (() -> Void)?
-    var onDrag: ((NSPoint) -> Void)?
     
     private var selectedTool: EditorTool = .text {
         didSet {
@@ -18,7 +17,6 @@ class ToolPaletteView: NSView {
     private var toolButtons: [EditorTool: NSButton] = [:]
     private var saveButton: NSButton!
     private var cancelButton: NSButton!
-    private var dragActive = false
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -204,25 +202,18 @@ class ToolPaletteView: NSView {
     override var intrinsicContentSize: NSSize {
         return NSSize(width: NSView.noIntrinsicMetric, height: 52)
     }
-
-    // MARK: - Drag support
+    
     override func mouseDown(with event: NSEvent) {
-        dragActive = true
+        super.mouseDown(with: event)
         NSCursor.closedHand.push()
     }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard dragActive else { return }
-        // Use high-rate delta values for smoother tracking
-        let delta = NSPoint(x: event.deltaX, y: event.deltaY)
-        onDrag?(delta)
-    }
-
+    
     override func mouseUp(with event: NSEvent) {
-        dragActive = false
+        super.mouseUp(with: event)
         NSCursor.pop()
+        window?.invalidateCursorRects(for: self)
     }
-
+    
     override func resetCursorRects() {
         discardCursorRects()
         addCursorRect(bounds, cursor: .openHand)

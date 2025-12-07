@@ -2,15 +2,14 @@ import Cocoa
 
 class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private var canvasView: EditorCanvasView!
+    private var paletteWindow: NSWindow!
     private var toolPaletteView: ToolPaletteView!
     private var saveHandler: ((NSImage) -> Void)?
     private var cancelHandler: (() -> Void)?
     private var localEventMonitor: Any?
-    private var paletteTopConstraint: NSLayoutConstraint?
-    private var paletteLeadingConstraint: NSLayoutConstraint?
-    private let paletteMargin: CGFloat = 12
     private let frameCornerRadius: CGFloat = 10
     private let frameBorderWidth: CGFloat = 2
+    private let palettePadding: CGFloat = 16
     
     convenience init(image: NSImage, saveHandler: @escaping (NSImage) -> Void, cancelHandler: @escaping () -> Void) {
         // Adjust image size for Retina displays if needed
@@ -44,6 +43,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         
         setupCanvasView(with: displayImage)
         setupToolPalette()
+        positionPaletteWindow()
         
         // Set window delegate to handle close button
         window.delegate = self
@@ -59,25 +59,17 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         }
     }
 
-    private func centerPalette() {
-        guard let leading = paletteLeadingConstraint, let canvas = canvasView else { return }
-        let paletteWidth = toolPaletteView.fittingSize.width
-        let centeredX = (canvas.bounds.width - paletteWidth) / 2
-        let minX = paletteMargin
-        let maxX = max(paletteMargin, canvas.bounds.width - paletteWidth - paletteMargin)
-        leading.constant = min(max(centeredX, minX), maxX)
-    }
-
-    private func movePalette(by delta: NSPoint) {
-        guard let leading = paletteLeadingConstraint, let top = paletteTopConstraint else { return }
-        let paletteSize = toolPaletteView.fittingSize
-        let maxX = max(paletteMargin, canvasView.bounds.width - paletteSize.width - paletteMargin)
-        let maxY = max(paletteMargin, canvasView.bounds.height - paletteSize.height - paletteMargin)
-        let nextX = min(max(paletteMargin, leading.constant + delta.x), maxX)
-        let nextY = min(max(paletteMargin, top.constant + delta.y), maxY)
-        leading.constant = nextX
-        top.constant = nextY
-        canvasView.layoutSubtreeIfNeeded()
+    private func positionPaletteWindow() {
+        guard let editorWindow = window, let palette = paletteWindow else { return }
+        
+        // Calculate position below the editor window, centered horizontally
+        let editorFrame = editorWindow.frame
+        let paletteSize = palette.frame.size
+        
+        let xPos = editorFrame.origin.x + (editorFrame.width - paletteSize.width) / 2
+        let yPos = editorFrame.origin.y - paletteSize.height - palettePadding
+        
+        palette.setFrameOrigin(NSPoint(x: xPos, y: yPos))
     }
     
     private func setupCanvasView(with image: NSImage) {
@@ -112,8 +104,9 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     }
     
     private func setupToolPalette() {
-        // Create floating tool palette
+        // Create tool palette view
         toolPaletteView = ToolPaletteView(frame: .zero)
+        
         // Синхронизируем выбор инструмента между палитрой и канвасом
         toolPaletteView.onToolSelected = { [weak self] tool in
             self?.applyToolSelection(tool)
@@ -124,25 +117,25 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         toolPaletteView.onCancel = { [weak self] in
             self?.cancelEditing()
         }
-        toolPaletteView.onDrag = { [weak self] delta in
-            self?.movePalette(by: delta)
-        }
+
+        // Create separate floating window for palette
+        let paletteSize = toolPaletteView.fittingSize
+        paletteWindow = FloatingPaletteWindow(
+            contentRect: NSRect(origin: .zero, size: paletteSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        paletteWindow.isOpaque = false
+        paletteWindow.backgroundColor = .clear
+        paletteWindow.level = .floating
+        paletteWindow.isMovableByWindowBackground = true
+        paletteWindow.contentView = toolPaletteView
+        paletteWindow.orderFront(nil)
 
         // Установить начальный инструмент и синхронизировать палитру
         let initialTool: EditorTool = .text
         applyToolSelection(initialTool)
-
-        canvasView.addSubview(toolPaletteView)
-
-        // Position palette at top center
-        toolPaletteView.translatesAutoresizingMaskIntoConstraints = false
-        paletteTopConstraint = toolPaletteView.topAnchor.constraint(equalTo: canvasView.topAnchor, constant: paletteMargin)
-        paletteLeadingConstraint = toolPaletteView.leadingAnchor.constraint(equalTo: canvasView.leadingAnchor, constant: paletteMargin)
-        NSLayoutConstraint.activate([paletteTopConstraint, paletteLeadingConstraint].compactMap { $0 })
-
-        // Center after layout to account for intrinsic size
-        canvasView.layoutSubtreeIfNeeded()
-        centerPalette()
     }
     
     // MARK: - EditorCanvasDelegate
@@ -236,6 +229,7 @@ extension ScreenshotEditorWindow: NSWindowDelegate {
             NSEvent.removeMonitor(monitor)
             localEventMonitor = nil
         }
+        paletteWindow?.close()
         cancelHandler?()
     }
 }
@@ -244,5 +238,16 @@ extension ScreenshotEditorWindow: NSWindowDelegate {
 private class EditorWindow: NSWindow {
     override var canBecomeKey: Bool {
         return true
+    }
+}
+
+// Custom window for palette with drag cursor
+private class FloatingPaletteWindow: NSWindow {
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if let contentView = contentView {
+            contentView.discardCursorRects()
+            contentView.addCursorRect(contentView.bounds, cursor: .openHand)
+        }
     }
 }
