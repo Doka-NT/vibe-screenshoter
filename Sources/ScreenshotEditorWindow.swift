@@ -15,7 +15,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     convenience init(image: NSImage, saveHandler: @escaping (NSImage) -> Void, cancelHandler: @escaping () -> Void) {
         // Adjust image size for Retina displays if needed
         // screencapture returns an image where size == pixels (72 DPI), but on Retina we want size == pixels / scale
-        var displayImage = image
+        let displayImage = image
         if let screen = NSScreen.main {
             let scale = screen.backingScaleFactor
             if scale > 1.0 {
@@ -51,7 +51,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         // Setup keyboard shortcut monitor
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             // Don't intercept events if a text view is first responder (user is typing)
-            if let firstResponder = self?.window?.firstResponder as? NSTextView {
+            if let responder = self?.window?.firstResponder, responder.isKind(of: NSTextView.self) {
                 print("DEBUG: Text view is first responder, allowing event through")
                 return event
             }
@@ -119,6 +119,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private func setupToolPalette() {
         // Create floating tool palette
         toolPaletteView = ToolPaletteView(frame: .zero)
+        // Синхронизируем выбор инструмента между палитрой и канвасом
         toolPaletteView.onToolSelected = { [weak self] tool in
             self?.canvasView.currentTool = tool
         }
@@ -131,12 +132,14 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         toolPaletteView.onDrag = { [weak self] delta in
             self?.movePalette(by: delta)
         }
-        
-        // Set initial tool to text (must be done after callbacks are set)
-        canvasView.currentTool = .text
-        
+
+        // Установить начальный инструмент и синхронизировать палитру
+        let initialTool: EditorTool = .text
+        canvasView.currentTool = initialTool
+        toolPaletteView.setSelectedTool(initialTool)
+
         canvasView.addSubview(toolPaletteView)
-        
+
         // Position palette at top center
         toolPaletteView.translatesAutoresizingMaskIntoConstraints = false
         paletteTopConstraint = toolPaletteView.topAnchor.constraint(equalTo: canvasView.topAnchor, constant: paletteMargin)

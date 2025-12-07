@@ -20,8 +20,25 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
     var currentTool: EditorTool = .none {
         didSet {
             print("DEBUG: currentTool changed from \(oldValue) to \(currentTool)")
+            updateCursorForCurrentTool()
         }
     }
+        // Обновляет курсор в зависимости от выбранного инструмента
+        private func updateCursorForCurrentTool() {
+            window?.invalidateCursorRects(for: self)
+        }
+
+        override func resetCursorRects() {
+            super.resetCursorRects()
+            switch currentTool {
+            case .text:
+                addCursorRect(bounds, cursor: .iBeam)
+            case .rectangle, .arrow, .redaction:
+                addCursorRect(bounds, cursor: .crosshair)
+            default:
+                addCursorRect(bounds, cursor: .arrow)
+            }
+        }
     
     // Temporary drawing state
     private var drawingStartPoint: NSPoint?

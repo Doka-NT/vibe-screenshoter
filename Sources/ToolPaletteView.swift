@@ -1,12 +1,20 @@
 import Cocoa
 
 class ToolPaletteView: NSView {
+        // Позволяет внешне установить выбранный инструмент
+        public func setSelectedTool(_ tool: EditorTool) {
+            selectedTool = tool
+        }
     var onToolSelected: ((EditorTool) -> Void)?
     var onSave: (() -> Void)?
     var onCancel: (() -> Void)?
     var onDrag: ((NSPoint) -> Void)?
     
-    private var selectedTool: EditorTool = .text
+    private var selectedTool: EditorTool = .text {
+        didSet {
+            updateSelection(tool: selectedTool)
+        }
+    }
     private var toolButtons: [EditorTool: NSButton] = [:]
     private var saveButton: NSButton!
     private var cancelButton: NSButton!
@@ -88,7 +96,11 @@ class ToolPaletteView: NSView {
         ])
         
         // Select text tool by default
-        updateSelection(tool: .text)
+        updateSelection(tool: selectedTool)
+        // Позволяет внешне установить выбранный инструмент
+        func setSelectedTool(_ tool: EditorTool) {
+            selectedTool = tool
+        }
     }
     
     private func createToolButton(tool: EditorTool, icon: String, tooltip: String) -> NSButton {

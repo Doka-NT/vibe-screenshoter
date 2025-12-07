@@ -1,3 +1,4 @@
+
 import Cocoa
 
 class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
@@ -102,11 +103,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
             let settingsVC = SettingsViewController()
             let window = NSWindow(contentViewController: settingsVC)
             window.title = "Preferences"
-            window.styleMask = [.titled, .closable]
+            window.styleMask = NSWindow.StyleMask(arrayLiteral: [.titled, .closable])
             window.center()
             settingsWindowController = NSWindowController(window: window)
         }
-        
         settingsWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
