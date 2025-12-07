@@ -1,0 +1,18 @@
+# Copilot Instructions for vibe-screenshoter
+
+- Purpose: macOS menu-bar screenshot tool; captures via `/usr/sbin/screencapture`, then opens a borderless editor to annotate and save PNGs.
+- Build/Run: `make` compiles with `swiftc` into `build/VibeScreenshoter.app`; `make run` opens the app; `make debug` runs the binary from `build/Contents/MacOS`; `make clean` clears the bundle. App expects `AppIcon.icns` beside `Info.plist`.
+- Entry/Status UI: `main.swift` boots `AppDelegate`. `AppDelegate` creates the status-item menu (screen capture, selection capture, preferences, quit) and shows shortcuts pulled from settings.
+- Capture flow: `captureScreen` uses `screencapture -t png -T 0`; `captureSelection` adds `-i` for interactive region. Temp file lives in `/tmp` via `generateTempScreenshotPath`; final path lives under `SettingsManager.saveLocation` (default Desktop) with timestamp naming.
+- Editor flow: `openEditor` loads the temp image and instantiates `ScreenshotEditorWindow` with `saveHandler` and `cancelHandler`; handlers save/cleanup and drop the window from `activeEditors` to keep it retained only while open. Saves both to clipboard and to disk.
+- Shortcuts: Global hotkeys are registered through `HotKeyManager` (Carbon `RegisterEventHotKey`). IDs are fixed (`1` = full screen, `2` = selection). `SettingsViewController` records shortcuts via a local key monitor; Esc cancels. After recording, it writes to `SettingsManager`, registers via `HotKeyManager.shared`, and calls `AppDelegate.updateMenuShortcuts()`.
+- Settings storage: `SettingsManager` wraps `UserDefaults` keys for save location and both shortcut keyCode/modifier pairs. Modifiers are stored as `NSEvent.ModifierFlags.rawValue` and converted to Carbon in `HotKeyManager.convertModifiers`.
+- Editor window: `ScreenshotEditorWindow` sizes itself to the image (adjusting for Retina scale), uses a borderless `EditorWindow` that can become key, embeds `EditorCanvasView` as content, and overlays `ToolPaletteView` (top-center). Local keyDown monitor triggers save on `⌘↩`. Cancel/save nil out handlers to avoid double-calls on close.
+- Canvas and tools: `EditorCanvasView` is flipped (origin top-left), draws the screenshot then annotations. Tools: text (inline `NSTextView` in a scroll view), rectangle and arrow (red stroke, width 3), redaction (black fill). Text editing commits via `endTextEditing()` before rendering; `renderFinalImage` calls it first.
+- Annotation models: `AnnotationModels.swift` defines protocol plus `TextAnnotation`, `RectangleAnnotation`, `ArrowAnnotation` (with arrowhead), and `RedactionAnnotation`. Hit-testing is simple bounding-box based.
+- Tool palette: `ToolPaletteView` builds a blurred HUD bar with SF Symbol buttons; callbacks `onToolSelected`, `onSave`, `onCancel`. Selection tint uses `contentTintColor`; default tool is `.text`.
+- Coordinate gotchas: Because the canvas is flipped, geometry calculations assume top-left origin; keep this in mind when adding tools or hit-testing.
+- Language/strings: Menu labels and tooltips are Russian; preserve the language for consistency.
+- Permissions/deps: Requires macOS 11+ (see `Info.plist`), Cocoa + Carbon frameworks only; relies on system `screencapture`. Hotkeys may need accessibility permission if events do not arrive.
+- Extension points: To add a new tool, extend `EditorTool`, add a button in `ToolPaletteView`, handle drawing/hit-testing in `EditorCanvasView`, and include it in `renderFinalImage` if it stores state.
+- Debug hints: Prints are already sprinkled in AppDelegate/EditorCanvas; if hotkeys fail, confirm registration logs and ensure modifiers are converted; if saves fail, check temp path existence and `cleanupTempFile` usage.

@@ -29,11 +29,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
         
         captureScreenMenuItem = NSMenuItem(title: "Снимок экрана", action: #selector(captureScreen), keyEquivalent: "")
         captureSelectionMenuItem = NSMenuItem(title: "Снимок области", action: #selector(captureSelection), keyEquivalent: "")
-        let preferencesItem = NSMenuItem(title: "Настройки...", action: #selector(openPreferences), keyEquivalent: ",")
-        let quitItem = NSMenuItem(title: "Выход", action: #selector(quit), keyEquivalent: "q")
+        let preferencesItem: NSMenuItem = NSMenuItem(title: "Настройки...", action: #selector(openPreferences), keyEquivalent: ",")
+        let quitItem: NSMenuItem = NSMenuItem(title: "Выход", action: #selector(quit), keyEquivalent: "q")
         
-        menu.addItem(captureScreenMenuItem)
         menu.addItem(captureSelectionMenuItem)
+        menu.addItem(captureScreenMenuItem)
         menu.addItem(NSMenuItem.separator())
         menu.addItem(preferencesItem)
         menu.addItem(NSMenuItem.separator())

@@ -6,6 +6,11 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     private var saveHandler: ((NSImage) -> Void)?
     private var cancelHandler: (() -> Void)?
     private var localEventMonitor: Any?
+    private var paletteTopConstraint: NSLayoutConstraint?
+    private var paletteLeadingConstraint: NSLayoutConstraint?
+    private let paletteMargin: CGFloat = 12
+    private let frameCornerRadius: CGFloat = 10
+    private let frameBorderWidth: CGFloat = 2
     
     convenience init(image: NSImage, saveHandler: @escaping (NSImage) -> Void, cancelHandler: @escaping () -> Void) {
         // Adjust image size for Retina displays if needed
@@ -28,6 +33,8 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
             defer: false
         )
         window.isMovableByWindowBackground = false
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.center()
         
         self.init(window: window)
@@ -56,14 +63,57 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
             return event
         }
     }
+
+    private func centerPalette() {
+        guard let leading = paletteLeadingConstraint, let canvas = canvasView else { return }
+        let paletteWidth = toolPaletteView.fittingSize.width
+        let centeredX = (canvas.bounds.width - paletteWidth) / 2
+        let minX = paletteMargin
+        let maxX = max(paletteMargin, canvas.bounds.width - paletteWidth - paletteMargin)
+        leading.constant = min(max(centeredX, minX), maxX)
+    }
+
+    private func movePalette(by delta: NSPoint) {
+        guard let leading = paletteLeadingConstraint, let top = paletteTopConstraint else { return }
+        let paletteSize = toolPaletteView.fittingSize
+        let maxX = max(paletteMargin, canvasView.bounds.width - paletteSize.width - paletteMargin)
+        let maxY = max(paletteMargin, canvasView.bounds.height - paletteSize.height - paletteMargin)
+        let nextX = min(max(paletteMargin, leading.constant + delta.x), maxX)
+        let nextY = min(max(paletteMargin, top.constant + delta.y), maxY)
+        leading.constant = nextX
+        top.constant = nextY
+        canvasView.layoutSubtreeIfNeeded()
+    }
     
     private func setupCanvasView(with image: NSImage) {
+        let containerView = NSView(frame: NSRect(origin: .zero, size: image.size))
+        containerView.wantsLayer = true
+        containerView.layer?.cornerRadius = frameCornerRadius
+        containerView.layer?.borderWidth = frameBorderWidth
+        containerView.layer?.borderColor = NSColor.black.withAlphaComponent(0.22).cgColor
+        containerView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.06).cgColor
+        containerView.layer?.shadowColor = NSColor.black.cgColor
+        containerView.layer?.shadowOpacity = 0.25
+        containerView.layer?.shadowRadius = 12
+        containerView.layer?.shadowOffset = CGSize(width: 0, height: -1)
+
         canvasView = EditorCanvasView(frame: NSRect(origin: .zero, size: image.size))
+        canvasView.translatesAutoresizingMaskIntoConstraints = false
         canvasView.screenshotImage = image
         canvasView.delegate = self
-        
-        // Set canvas directly as content view (no scrollbars)
-        window!.contentView = canvasView
+        canvasView.wantsLayer = true
+        canvasView.layer?.cornerRadius = frameCornerRadius
+        canvasView.layer?.masksToBounds = true
+
+        containerView.addSubview(canvasView)
+        NSLayoutConstraint.activate([
+            canvasView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            canvasView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            canvasView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            canvasView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+        ])
+
+        window!.contentView = containerView
     }
     
     private func setupToolPalette() {
@@ -78,6 +128,9 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         toolPaletteView.onCancel = { [weak self] in
             self?.cancelEditing()
         }
+        toolPaletteView.onDrag = { [weak self] delta in
+            self?.movePalette(by: delta)
+        }
         
         // Set initial tool to text (must be done after callbacks are set)
         canvasView.currentTool = .text
@@ -86,10 +139,13 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         
         // Position palette at top center
         toolPaletteView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            toolPaletteView.topAnchor.constraint(equalTo: canvasView.topAnchor, constant: 12),
-            toolPaletteView.centerXAnchor.constraint(equalTo: canvasView.centerXAnchor)
-        ])
+        paletteTopConstraint = toolPaletteView.topAnchor.constraint(equalTo: canvasView.topAnchor, constant: paletteMargin)
+        paletteLeadingConstraint = toolPaletteView.leadingAnchor.constraint(equalTo: canvasView.leadingAnchor, constant: paletteMargin)
+        NSLayoutConstraint.activate([paletteTopConstraint, paletteLeadingConstraint].compactMap { $0 })
+
+        // Center after layout to account for intrinsic size
+        canvasView.layoutSubtreeIfNeeded()
+        centerPalette()
     }
     
     // MARK: - EditorCanvasDelegate

@@ -4,11 +4,13 @@ class ToolPaletteView: NSView {
     var onToolSelected: ((EditorTool) -> Void)?
     var onSave: (() -> Void)?
     var onCancel: (() -> Void)?
+    var onDrag: ((NSPoint) -> Void)?
     
     private var selectedTool: EditorTool = .text
     private var toolButtons: [EditorTool: NSButton] = [:]
     private var saveButton: NSButton!
     private var cancelButton: NSButton!
+    private var dragActive = false
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -27,17 +29,21 @@ class ToolPaletteView: NSView {
         let visualEffect = NSVisualEffectView()
         visualEffect.material = .hudWindow
         visualEffect.state = .active
-        visualEffect.blendingMode = .behindWindow
+        visualEffect.blendingMode = .withinWindow
+        visualEffect.appearance = NSAppearance(named: .vibrantDark)
         visualEffect.wantsLayer = true
-        visualEffect.layer?.cornerRadius = 10
+        visualEffect.layer?.cornerRadius = 12
+        visualEffect.layer?.backgroundColor = NSColor(calibratedWhite: 0.06, alpha: 0.78).cgColor
+        visualEffect.layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
+        visualEffect.layer?.borderWidth = 1
         visualEffect.translatesAutoresizingMaskIntoConstraints = false
         addSubview(visualEffect)
         
         // Create horizontal stack for all buttons
         let stackView = NSStackView()
         stackView.orientation = .horizontal
-        stackView.spacing = 8
-        stackView.edgeInsets = NSEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        stackView.spacing = 10
+        stackView.edgeInsets = NSEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         stackView.translatesAutoresizingMaskIntoConstraints = false
         visualEffect.addSubview(stackView)
         
@@ -176,5 +182,28 @@ class ToolPaletteView: NSView {
     
     override var intrinsicContentSize: NSSize {
         return NSSize(width: NSView.noIntrinsicMetric, height: 52)
+    }
+
+    // MARK: - Drag support
+    override func mouseDown(with event: NSEvent) {
+        dragActive = true
+        NSCursor.closedHand.push()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard dragActive else { return }
+        // Use high-rate delta values for smoother tracking
+        let delta = NSPoint(x: event.deltaX, y: event.deltaY)
+        onDrag?(delta)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        dragActive = false
+        NSCursor.pop()
+    }
+
+    override func resetCursorRects() {
+        discardCursorRects()
+        addCursorRect(bounds, cursor: .openHand)
     }
 }
