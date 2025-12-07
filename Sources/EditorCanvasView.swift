@@ -292,7 +292,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         textView.font = font
         textView.textColor = color
         textView.drawsBackground = true
-        textView.backgroundColor = NSColor.white.withAlphaComponent(0.1)
+        textView.backgroundColor = NSColor.white.withAlphaComponent(0.08)
         textView.insertionPointColor = color
         
         // Behavior
@@ -315,12 +315,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.minSize = NSSize(width: 50, height: 30)
         
-        // Add a visible border for debugging
         textView.wantsLayer = true
-        textView.layer?.borderColor = NSColor.red.withAlphaComponent(0.5).cgColor
-        textView.layer?.borderWidth = 2.0
-        
-        print("DEBUG: setupTextView - isEditable: \(textView.isEditable), isSelectable: \(textView.isSelectable)")
     }
 
     private func resizeActiveTextViewToFitContent() {

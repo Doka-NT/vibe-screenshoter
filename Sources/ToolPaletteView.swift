@@ -97,10 +97,6 @@ class ToolPaletteView: NSView {
         
         // Select text tool by default
         updateSelection(tool: selectedTool)
-        // Позволяет внешне установить выбранный инструмент
-        func setSelectedTool(_ tool: EditorTool) {
-            selectedTool = tool
-        }
     }
     
     private func createToolButton(tool: EditorTool, icon: String, tooltip: String) -> NSButton {

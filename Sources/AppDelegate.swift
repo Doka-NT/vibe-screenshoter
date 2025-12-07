@@ -102,7 +102,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, HotKeyDelegate {
         if settingsWindowController == nil {
             let settingsVC = SettingsViewController()
             let window = NSWindow(contentViewController: settingsVC)
-            window.title = "Preferences"
+            window.title = "Настройки"
             window.styleMask = NSWindow.StyleMask(arrayLiteral: [.titled, .closable])
             window.center()
             settingsWindowController = NSWindowController(window: window)

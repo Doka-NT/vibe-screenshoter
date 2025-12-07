@@ -50,14 +50,9 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         
         // Setup keyboard shortcut monitor
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // Don't intercept events if a text view is first responder (user is typing)
-            if let responder = self?.window?.firstResponder, responder.isKind(of: NSTextView.self) {
-                print("DEBUG: Text view is first responder, allowing event through")
-                return event
-            }
-            
-            if event.modifierFlags.contains(.command) && event.keyCode == 36 { // 36 is Enter
-                self?.saveImage()
+            guard let self else { return event }
+            let isTextEditing = (self.window?.firstResponder?.isKind(of: NSTextView.self) == true)
+            if self.handleKey(event: event, isTextEditing: isTextEditing) {
                 return nil
             }
             return event
@@ -121,7 +116,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         toolPaletteView = ToolPaletteView(frame: .zero)
         // Синхронизируем выбор инструмента между палитрой и канвасом
         toolPaletteView.onToolSelected = { [weak self] tool in
-            self?.canvasView.currentTool = tool
+            self?.applyToolSelection(tool)
         }
         toolPaletteView.onSave = { [weak self] in
             self?.saveImage()
@@ -135,8 +130,7 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
 
         // Установить начальный инструмент и синхронизировать палитру
         let initialTool: EditorTool = .text
-        canvasView.currentTool = initialTool
-        toolPaletteView.setSelectedTool(initialTool)
+        applyToolSelection(initialTool)
 
         canvasView.addSubview(toolPaletteView)
 
@@ -178,6 +172,58 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         saveHandler = nil
         cancelHandler = nil
         window?.close()
+    }
+    
+    private func handleKey(event: NSEvent, isTextEditing: Bool) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        if modifiers.contains(.command) && event.keyCode == 36 { // ⌘Enter
+            saveImage()
+            return true
+        }
+        
+        if event.keyCode == 53 { // Esc
+            cancelEditing()
+            return true
+        }
+
+        // Only switch tools when not typing
+        if !isTextEditing && modifiers.isEmpty {
+            if let tool = toolForKey(event) {
+                applyToolSelection(tool)
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    private func toolForKey(_ event: NSEvent) -> EditorTool? {
+        // Prefer keyCode for reliability, fall back to character
+        switch event.keyCode {
+        case 17: return .text      // T
+        case 15: return .rectangle // R
+        case 0:  return .arrow     // A
+        case 11: return .redaction // B
+        default:
+            break
+        }
+        if let character = event.charactersIgnoringModifiers?.lowercased() {
+            switch character {
+            case "t": return .text
+            case "r": return .rectangle
+            case "a": return .arrow
+            case "b": return .redaction
+            default:
+                break
+            }
+        }
+        return nil
+    }
+    
+    private func applyToolSelection(_ tool: EditorTool) {
+        canvasView.currentTool = tool
+        toolPaletteView.setSelectedTool(tool)
     }
     
 }

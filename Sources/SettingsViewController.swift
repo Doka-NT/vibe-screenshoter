@@ -43,7 +43,7 @@ class SettingsViewController: NSViewController {
         
         // Save Location Section
         let locationBox = NSBox()
-        locationBox.title = "Save Location"
+        locationBox.title = "Папка для сохранения"
         locationBox.boxType = .primary
         
         let locationStack = NSStackView()
@@ -54,7 +54,7 @@ class SettingsViewController: NSViewController {
         pathLabel.lineBreakMode = .byTruncatingMiddle
         pathLabel.maximumNumberOfLines = 1
         
-        let changeButton = NSButton(title: "Change...", target: self, action: #selector(changeLocation))
+        let changeButton = NSButton(title: "Изменить…", target: self, action: #selector(changeLocation))
         
         locationStack.addArrangedSubview(pathLabel)
         locationStack.addArrangedSubview(changeButton)
@@ -64,7 +64,7 @@ class SettingsViewController: NSViewController {
         
         // Shortcuts Section
         let shortcutsBox = NSBox()
-        shortcutsBox.title = "Global Shortcuts"
+        shortcutsBox.title = "Глобальные сочетания"
         shortcutsBox.boxType = .primary
         
         let shortcutsStack = NSStackView()
@@ -73,10 +73,10 @@ class SettingsViewController: NSViewController {
         shortcutsStack.spacing = 15
         
         // Screen shortcut
-        let screenLabel = NSTextField(labelWithString: "Screen Capture:")
+        let screenLabel = NSTextField(labelWithString: "Снимок экрана:")
         screenLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         
-        screenShortcutField.placeholderString = "Click to record shortcut"
+        screenShortcutField.placeholderString = "Нажмите, чтобы записать сочетание"
         screenShortcutField.isEditable = false
         screenShortcutField.isSelectable = true
         screenShortcutField.wantsLayer = true
@@ -92,10 +92,10 @@ class SettingsViewController: NSViewController {
         screenContainer.addArrangedSubview(screenShortcutField)
         
         // Selection shortcut
-        let selectionLabel = NSTextField(labelWithString: "Selection Capture:")
+        let selectionLabel = NSTextField(labelWithString: "Снимок области:")
         selectionLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
         
-        selectionShortcutField.placeholderString = "Click to record shortcut"
+        selectionShortcutField.placeholderString = "Нажмите, чтобы записать сочетание"
         selectionShortcutField.isEditable = false
         selectionShortcutField.isSelectable = true
         selectionShortcutField.wantsLayer = true
@@ -110,7 +110,7 @@ class SettingsViewController: NSViewController {
         selectionContainer.addArrangedSubview(selectionLabel)
         selectionContainer.addArrangedSubview(selectionShortcutField)
         
-        let infoLabel = NSTextField(labelWithString: "Press Esc to cancel recording")
+        let infoLabel = NSTextField(labelWithString: "Нажмите Esc, чтобы отменить запись")
         infoLabel.textColor = .secondaryLabelColor
         infoLabel.font = NSFont.systemFont(ofSize: 11)
         
@@ -140,7 +140,7 @@ class SettingsViewController: NSViewController {
            let mods = SettingsManager.shared.screenShortcutModifiers {
             screenShortcutField.stringValue = stringFor(keyCode: code, modifiers: mods)
         } else {
-            screenShortcutField.stringValue = "None"
+            screenShortcutField.stringValue = "Нет"
         }
         
         // Update selection shortcut
@@ -148,7 +148,7 @@ class SettingsViewController: NSViewController {
            let mods = SettingsManager.shared.selectionShortcutModifiers {
             selectionShortcutField.stringValue = stringFor(keyCode: code, modifiers: mods)
         } else {
-            selectionShortcutField.stringValue = "None"
+            selectionShortcutField.stringValue = "Нет"
         }
     }
     
@@ -180,7 +180,7 @@ class SettingsViewController: NSViewController {
         recordingType = type
         
         let field = type == .screen ? screenShortcutField : selectionShortcutField
-        field.stringValue = "Recording... Press keys"
+        field.stringValue = "Запись… Нажмите клавиши"
         field.layer?.borderColor = NSColor.systemBlue.cgColor
         field.layer?.borderWidth = 2.0
         
