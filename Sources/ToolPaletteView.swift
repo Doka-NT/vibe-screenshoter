@@ -107,12 +107,19 @@ class ToolPaletteView: NSView {
         let button = NSButton()
         button.bezelStyle = .texturedRounded
         button.isBordered = true
+        button.setButtonType(.toggle) // keep state to show selection
+        button.focusRingType = .none // avoid persistent system focus outline
         button.image = NSImage(systemSymbolName: icon, accessibilityDescription: tooltip)
         button.imagePosition = .imageOnly
         button.toolTip = tooltip
         button.target = self
         button.action = #selector(toolButtonClicked(_:))
         button.tag = tool.rawValue
+
+        // Enable layer-backed styling for selection background
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 8
+        button.layer?.masksToBounds = true
         
         // Set button size
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -185,9 +192,15 @@ class ToolPaletteView: NSView {
             if buttonTool == tool {
                 button.state = .on
                 button.contentTintColor = .controlAccentColor
+                button.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+                button.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.45).cgColor
+                button.layer?.borderWidth = 1
             } else {
                 button.state = .off
                 button.contentTintColor = nil
+                button.layer?.backgroundColor = NSColor.clear.cgColor
+                button.layer?.borderColor = NSColor.clear.cgColor
+                button.layer?.borderWidth = 0
             }
         }
     }
