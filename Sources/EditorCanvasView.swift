@@ -228,6 +228,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         // Add scroll view to canvas
         self.addSubview(scrollView)
         self.activeTextScrollView = scrollView
+        resizeActiveTextViewToFitContent()
         
         print("DEBUG: textView.window = \(String(describing: textView.window))")
         print("DEBUG: self.window = \(String(describing: self.window))")
@@ -248,8 +249,15 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: annotation.font
         ]
-        let size = annotation.text.size(withAttributes: attributes)
-        let rect = NSRect(origin: annotation.position, size: NSSize(width: max(size.width + 20, 100), height: max(size.height, 30)))
+        let bounding = NSString(string: annotation.text).boundingRect(
+            with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        )
+        let rect = NSRect(
+            origin: annotation.position,
+            size: NSSize(width: max(bounding.width + 20, 100), height: max(bounding.height + 10, 30))
+        )
         
         // Create scroll view to contain the text view
         let scrollView = NSScrollView(frame: rect)
@@ -268,6 +276,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         
         self.addSubview(scrollView)
         self.activeTextScrollView = scrollView
+        resizeActiveTextViewToFitContent()
         self.window?.makeFirstResponder(textView)
         
         // Trigger redraw to hide the annotation being edited
@@ -297,13 +306,13 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = true
         textView.autoresizingMask = [.width, .height]
-        
+
         if let textContainer = textView.textContainer {
-            textContainer.containerSize = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
+            textContainer.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
             textContainer.widthTracksTextView = false
         }
-        
-        textView.maxSize = NSSize(width: 500, height: CGFloat.greatestFiniteMagnitude)
+
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.minSize = NSSize(width: 50, height: 30)
         
         // Add a visible border for debugging
@@ -313,10 +322,44 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         
         print("DEBUG: setupTextView - isEditable: \(textView.isEditable), isSelectable: \(textView.isSelectable)")
     }
+
+    private func resizeActiveTextViewToFitContent() {
+        guard let scrollView = activeTextScrollView,
+              let textView = scrollView.documentView as? NSTextView,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else { return }
+
+        layoutManager.ensureLayout(for: textContainer)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        let padding: CGFloat = 10
+        let lineHeight = layoutManager.defaultLineHeight(for: textView.font ?? .systemFont(ofSize: 24, weight: .bold))
+        var newHeight = ceil(usedRect.height) + padding
+
+        // If the text ends with a newline or is empty, ensure space for the current line
+        if textView.string.isEmpty {
+            newHeight = lineHeight + padding
+        } else if textView.string.hasSuffix("\n") {
+            newHeight += lineHeight
+        }
+
+        let newSize = NSSize(
+            width: max(textView.minSize.width, ceil(usedRect.width) + padding),
+            height: max(textView.minSize.height, newHeight)
+        )
+
+        textContainer.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: newSize.height)
+        textView.frame.size = newSize
+
+        var frame = scrollView.frame
+        frame.size = newSize
+        scrollView.frame = frame
+    }
     
     private func endTextEditing() {
         guard let scrollView = activeTextScrollView,
               let textView = scrollView.documentView as? NSTextView else { return }
+
+        resizeActiveTextViewToFitContent()
         
         let text = textView.string
         let origin = scrollView.frame.origin
@@ -345,6 +388,10 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         needsDisplay = true
     }
     
+    func textDidChange(_ notification: Notification) {
+        resizeActiveTextViewToFitContent()
+    }
+
     func textDidEndEditing(_ notification: Notification) {
         // This is called when focus is lost (e.g. tab or click away)
         // We handle click away in mouseDown, but this is good backup
@@ -356,6 +403,19 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         endTextEditing()
     }
     
+    func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+            if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
+                // Let the newline be inserted normally and resize afterwards
+                return false
+            } else {
+                endTextEditing()
+                return true
+            }
+        }
+        return false
+    }
+
     // Render the final image with all annotations
     func renderFinalImage() -> NSImage? {
         // Ensure any active editing is committed

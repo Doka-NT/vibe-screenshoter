@@ -27,15 +27,29 @@ class TextAnnotation: Annotation {
             .font: font,
             .foregroundColor: color
         ]
-        text.draw(at: position, withAttributes: attributes)
+        let attributed = NSString(string: text)
+        let bounding = attributed.boundingRect(
+            with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        )
+        attributed.draw(
+            with: NSRect(origin: position, size: bounding.size),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        )
     }
     
     func hitTest(point: NSPoint) -> Bool {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font
         ]
-        let size = text.size(withAttributes: attributes)
-        let rect = NSRect(origin: position, size: size)
+        let bounding = NSString(string: text).boundingRect(
+            with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        )
+        let rect = NSRect(origin: position, size: bounding.size)
         return rect.contains(point)
     }
 }
