@@ -24,16 +24,19 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
             }
         }
 
-        // Create window without title bar for cleaner look
+        // Создаем стандартное окно с заголовком, чтобы рамка была видимой
         let window = EditorWindow(
             contentRect: NSRect(x: 0, y: 0, width: displayImage.size.width, height: displayImage.size.height),
-            styleMask: [.borderless, .closable],
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
+        window.title = "Редактор скриншота"
+        window.titleVisibility = .visible
+        window.titlebarAppearsTransparent = false
+        window.setContentSize(displayImage.size)
+        window.backgroundColor = .windowBackgroundColor
         window.isMovableByWindowBackground = false
-        window.isOpaque = false
-        window.backgroundColor = .clear
         window.center()
         
         self.init(window: window)

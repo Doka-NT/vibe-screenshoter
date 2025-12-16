@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "name": "Debug VibeScreenshoter",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/VibeScreenshoter.app/Contents/MacOS/VibeScreenshoter",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "preLaunchTask": "Build VibeScreenshoter.app"
+        }
+    ]
+}
