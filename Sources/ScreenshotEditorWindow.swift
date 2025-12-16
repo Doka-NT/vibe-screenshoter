@@ -152,18 +152,12 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
             pasteboard.writeObjects([finalImage])
             
             saveHandler?(finalImage)
-            // Prevent double-calling handlers in windowWillClose
-            saveHandler = nil
-            cancelHandler = nil
             window?.close()
         }
     }
     
     @objc private func cancelEditing() {
         cancelHandler?()
-        // Prevent double-calling handlers in windowWillClose
-        saveHandler = nil
-        cancelHandler = nil
         window?.close()
     }
     
