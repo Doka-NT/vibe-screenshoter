@@ -1,13 +1,14 @@
 import Cocoa
 
 class ToolPaletteView: NSView {
-        // Позволяет внешне установить выбранный инструмент
-        public func setSelectedTool(_ tool: EditorTool) {
-            selectedTool = tool
-        }
+    // Позволяет внешне установить выбранный инструмент
+    func setSelectedTool(_ tool: EditorTool) {
+        selectedTool = tool
+    }
     var onToolSelected: ((EditorTool) -> Void)?
     var onSave: (() -> Void)?
     var onCancel: (() -> Void)?
+    var onFontSizeChanged: ((CGFloat) -> Void)?
     
     private var selectedTool: EditorTool = .text {
         didSet {
@@ -17,6 +18,9 @@ class ToolPaletteView: NSView {
     private var toolButtons: [EditorTool: NSButton] = [:]
     private var saveButton: NSButton!
     private var cancelButton: NSButton!
+    private var fontSlider: NSSlider!
+    private var fontValueLabel: NSTextField!
+    private var fontSize: CGFloat = 24
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -66,10 +70,13 @@ class ToolPaletteView: NSView {
         
         // Create separator
         let separator1 = createSeparator()
+        let separator2 = createSeparator()
         
         // Create action buttons
         saveButton = createActionButton(icon: "checkmark.circle.fill", tooltip: "Сохранить (⌘↩)", action: #selector(saveAction), color: .systemGreen)
         cancelButton = createActionButton(icon: "xmark.circle.fill", tooltip: "Отмена (Esc)", action: #selector(cancelAction), color: .systemRed)
+
+        let fontControl = createFontControl()
         
         // Add all buttons to stack
         stackView.addArrangedSubview(textButton)
@@ -77,6 +84,8 @@ class ToolPaletteView: NSView {
         stackView.addArrangedSubview(arrowButton)
         stackView.addArrangedSubview(redactionButton)
         stackView.addArrangedSubview(separator1)
+        stackView.addArrangedSubview(fontControl)
+        stackView.addArrangedSubview(separator2)
         stackView.addArrangedSubview(saveButton)
         stackView.addArrangedSubview(cancelButton)
         
@@ -164,6 +173,40 @@ class ToolPaletteView: NSView {
         ])
         return separator
     }
+
+    private func createFontControl() -> NSView {
+        let container = NSStackView()
+        container.orientation = .vertical
+        container.alignment = .centerX
+        container.spacing = 4
+
+        let label = NSTextField(labelWithString: "Размер текста")
+        label.font = .systemFont(ofSize: 11, weight: .medium)
+        label.textColor = .white.withAlphaComponent(0.8)
+
+        fontSlider = NSSlider(value: Double(fontSize), minValue: 12, maxValue: 72, target: self, action: #selector(fontSliderChanged(_:)))
+        fontSlider.sliderType = .linear
+        fontSlider.isContinuous = true
+        fontSlider.controlSize = .small
+        fontSlider.allowsTickMarkValuesOnly = false
+        fontSlider.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            fontSlider.widthAnchor.constraint(equalToConstant: 140)
+        ])
+
+        fontValueLabel = NSTextField(labelWithString: formattedFontSize(fontSize))
+        fontValueLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        fontValueLabel.textColor = .white
+
+        let sliderRow = NSStackView(views: [fontSlider, fontValueLabel])
+        sliderRow.orientation = .horizontal
+        sliderRow.spacing = 8
+        sliderRow.alignment = .centerY
+
+        container.addArrangedSubview(label)
+        container.addArrangedSubview(sliderRow)
+        return container
+    }
     
     @objc private func toolButtonClicked(_ sender: NSButton) {
         guard let tool = EditorTool(rawValue: sender.tag) else { return }
@@ -178,6 +221,13 @@ class ToolPaletteView: NSView {
     
     @objc private func cancelAction() {
         onCancel?()
+    }
+
+    @objc private func fontSliderChanged(_ sender: NSSlider) {
+        fontSize = CGFloat(round(sender.doubleValue))
+        fontSlider.doubleValue = Double(fontSize)
+        fontValueLabel.stringValue = formattedFontSize(fontSize)
+        onFontSizeChanged?(fontSize)
     }
     
     private func updateSelection(tool: EditorTool) {
@@ -202,6 +252,13 @@ class ToolPaletteView: NSView {
     override var intrinsicContentSize: NSSize {
         return NSSize(width: NSView.noIntrinsicMetric, height: 52)
     }
+
+    func setFontSize(_ size: CGFloat) {
+        let rounded = CGFloat(round(size))
+        fontSize = rounded
+        fontSlider?.doubleValue = Double(rounded)
+        fontValueLabel?.stringValue = formattedFontSize(rounded)
+    }
     
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
@@ -217,5 +274,9 @@ class ToolPaletteView: NSView {
     override func resetCursorRects() {
         discardCursorRects()
         addCursorRect(bounds, cursor: .openHand)
+    }
+    
+    private func formattedFontSize(_ size: CGFloat) -> String {
+        return "\(Int(round(size))) pt"
     }
 }

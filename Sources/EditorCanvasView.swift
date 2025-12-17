@@ -9,7 +9,7 @@ enum EditorTool: Int {
 }
 
 protocol EditorCanvasDelegate: AnyObject {
-    // No longer needed for text input, but keeping for potential future use or cleanup
+    func editorCanvasView(_ canvas: EditorCanvasView, didChangeTextFontSize size: CGFloat)
 }
 
 class EditorCanvasView: NSView, NSTextViewDelegate {
@@ -23,22 +23,29 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
             updateCursorForCurrentTool()
         }
     }
-        // Обновляет курсор в зависимости от выбранного инструмента
-        private func updateCursorForCurrentTool() {
-            window?.invalidateCursorRects(for: self)
+    private var isFontSizeChangeInternal = false
+    private(set) var textFontSize: CGFloat = 24 {
+        didSet {
+            applyFontSizeChange()
         }
+    }
 
-        override func resetCursorRects() {
-            super.resetCursorRects()
-            switch currentTool {
-            case .text:
-                addCursorRect(bounds, cursor: .iBeam)
-            case .rectangle, .arrow, .redaction:
-                addCursorRect(bounds, cursor: .crosshair)
-            default:
-                addCursorRect(bounds, cursor: .arrow)
-            }
+    // Обновляет курсор в зависимости от выбранного инструмента
+    private func updateCursorForCurrentTool() {
+        window?.invalidateCursorRects(for: self)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        switch currentTool {
+        case .text:
+            addCursorRect(bounds, cursor: .iBeam)
+        case .rectangle, .arrow, .redaction:
+            addCursorRect(bounds, cursor: .crosshair)
+        default:
+            addCursorRect(bounds, cursor: .arrow)
         }
+    }
     
     // Temporary drawing state
     private var drawingStartPoint: NSPoint?
@@ -123,6 +130,7 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         guard let start = drawingStartPoint else { return }
         
         let end = convert(event.locationInWindow, from: nil)
+        
         
         switch currentTool {
         case .rectangle:
@@ -278,18 +286,19 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         self.activeTextScrollView = scrollView
         resizeActiveTextViewToFitContent()
         self.window?.makeFirstResponder(textView)
+        setTextFontSize(annotation.font.pointSize)
         
         // Trigger redraw to hide the annotation being edited
         needsDisplay = true
     }
     
-    private func setupTextView(_ textView: NSTextView, font: NSFont = .systemFont(ofSize: 24, weight: .bold), color: NSColor = .red) {
+    private func setupTextView(_ textView: NSTextView, font: NSFont? = nil, color: NSColor = .red) {
         // CRITICAL: Make sure the text view is editable and selectable
         textView.isEditable = true
         textView.isSelectable = true
         
         // Appearance
-        textView.font = font
+        textView.font = font ?? TextAnnotation.font(ofSize: textFontSize)
         textView.textColor = color
         textView.drawsBackground = true
         textView.backgroundColor = NSColor.white.withAlphaComponent(0.08)
@@ -364,10 +373,15 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
                 // Update existing
                 existing.text = text
                 existing.position = origin
+                existing.font = TextAnnotation.font(ofSize: textFontSize)
                 // If we changed font/color in setup, update them too. For now they are static.
             } else {
                 // Create new
-                let annotation = TextAnnotation(text: text, position: origin)
+                let annotation = TextAnnotation(
+                    text: text,
+                    position: origin,
+                    font: TextAnnotation.font(ofSize: textFontSize)
+                )
                 annotations.append(annotation)
             }
         } else {
@@ -433,5 +447,34 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         
         finalImage.unlockFocus()
         return finalImage
+    }
+
+    func setTextFontSize(_ size: CGFloat, notifyDelegate: Bool = true) {
+        let clamped = clampFontSize(size)
+        guard textFontSize != clamped else { return }
+        isFontSizeChangeInternal = !notifyDelegate
+        textFontSize = clamped
+        isFontSizeChangeInternal = false
+    }
+    
+    private func clampFontSize(_ size: CGFloat) -> CGFloat {
+        return max(12, min(size, 72))
+    }
+    
+    private func applyFontSizeChange() {
+        updateActiveTextViewFont()
+        if let editing = editingAnnotation {
+            editing.font = TextAnnotation.font(ofSize: textFontSize)
+        }
+        if !isFontSizeChangeInternal {
+            delegate?.editorCanvasView(self, didChangeTextFontSize: textFontSize)
+        }
+    }
+    
+    private func updateActiveTextViewFont() {
+        guard let scrollView = activeTextScrollView,
+              let textView = scrollView.documentView as? NSTextView else { return }
+        textView.font = TextAnnotation.font(ofSize: textFontSize)
+        resizeActiveTextViewToFitContent()
     }
 }

@@ -15,11 +15,15 @@ class TextAnnotation: Annotation {
     var font: NSFont
     var color: NSColor
     
-    init(text: String, position: NSPoint, font: NSFont = .systemFont(ofSize: 24, weight: .bold), color: NSColor = .red) {
+    init(text: String, position: NSPoint, font: NSFont = TextAnnotation.font(ofSize: 24), color: NSColor = .red) {
         self.text = text
         self.position = position
         self.font = font
         self.color = color
+    }
+
+    static func font(ofSize size: CGFloat) -> NSFont {
+        return .systemFont(ofSize: size, weight: .bold)
     }
     
     func draw() {

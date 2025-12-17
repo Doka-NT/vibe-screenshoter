@@ -120,6 +120,9 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         toolPaletteView.onCancel = { [weak self] in
             self?.cancelEditing()
         }
+        toolPaletteView.onFontSizeChanged = { [weak self] size in
+            self?.canvasView.setTextFontSize(size, notifyDelegate: false)
+        }
 
         // Create separate floating window for palette
         let paletteSize = toolPaletteView.fittingSize
@@ -139,11 +142,14 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         // Установить начальный инструмент и синхронизировать палитру
         let initialTool: EditorTool = .text
         applyToolSelection(initialTool)
+        toolPaletteView.setFontSize(canvasView.textFontSize)
     }
     
     // MARK: - EditorCanvasDelegate
     
-    // No longer needed for text input as it's handled inline
+    func editorCanvasView(_ canvas: EditorCanvasView, didChangeTextFontSize size: CGFloat) {
+        toolPaletteView.setFontSize(size)
+    }
     
     // MARK: - Actions
     
