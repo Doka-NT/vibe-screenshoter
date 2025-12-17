@@ -30,6 +30,11 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         }
     }
 
+    // Dragging state for moving existing annotations
+    private var draggingAnnotation: Annotation?
+    private var dragLastPoint: NSPoint?
+    private var didDragDuringMouseDown = false
+
     // Обновляет курсор в зависимости от выбранного инструмента
     private func updateCursorForCurrentTool() {
         window?.invalidateCursorRects(for: self)
@@ -95,6 +100,14 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         let point = convert(event.locationInWindow, from: nil)
         
         print("DEBUG: mouseDown with currentTool = \(currentTool)")
+
+        // Try to start dragging an existing annotation first
+        if let hit = annotation(at: point) {
+            draggingAnnotation = hit
+            dragLastPoint = point
+            didDragDuringMouseDown = false
+            return
+        }
         
         switch currentTool {
         case .text:
@@ -119,17 +132,44 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
     }
     
     override func mouseDragged(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        // Move existing annotation if any
+        if let dragging = draggingAnnotation, let last = dragLastPoint {
+            let delta = NSPoint(x: point.x - last.x, y: point.y - last.y)
+            translate(annotation: dragging, by: delta)
+            dragLastPoint = point
+            didDragDuringMouseDown = true
+            needsDisplay = true
+            return
+        }
+
         guard drawingStartPoint != nil else { return }
         
-        let point = convert(event.locationInWindow, from: nil)
         drawingCurrentPoint = point
         needsDisplay = true
     }
     
     override func mouseUp(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        // Finish dragging if needed
+        if let dragging = draggingAnnotation {
+            if let text = dragging as? TextAnnotation, !didDragDuringMouseDown {
+                // If it was a simple click without drag, enter edit mode for text when tool is text
+                if currentTool == .text {
+                    startEditing(annotation: text)
+                }
+            }
+            draggingAnnotation = nil
+            dragLastPoint = nil
+            didDragDuringMouseDown = false
+            return
+        }
+
         guard let start = drawingStartPoint else { return }
         
-        let end = convert(event.locationInWindow, from: nil)
+        let end = point
         
         
         switch currentTool {
@@ -423,6 +463,39 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
             }
         }
         return false
+    }
+
+    // MARK: - Hit Testing & Moving
+
+    private func annotation(at point: NSPoint) -> Annotation? {
+        // Search from topmost to bottommost
+        for annotation in annotations.reversed() {
+            if annotation.hitTest(point: point) {
+                return annotation
+            }
+        }
+        return nil
+    }
+
+    private func translate(annotation: Annotation, by delta: NSPoint) {
+        switch annotation {
+        case let text as TextAnnotation:
+            text.position.x += delta.x
+            text.position.y += delta.y
+        case let rect as RectangleAnnotation:
+            rect.rect.origin.x += delta.x
+            rect.rect.origin.y += delta.y
+        case let arrow as ArrowAnnotation:
+            arrow.startPoint.x += delta.x
+            arrow.startPoint.y += delta.y
+            arrow.endPoint.x += delta.x
+            arrow.endPoint.y += delta.y
+        case let redaction as RedactionAnnotation:
+            redaction.rect.origin.x += delta.x
+            redaction.rect.origin.y += delta.y
+        default:
+            break
+        }
     }
 
     // Render the final image with all annotations
