@@ -300,8 +300,8 @@ class EditorCanvasView: NSView, NSTextViewDelegate {
         // Appearance
         textView.font = font ?? TextAnnotation.font(ofSize: textFontSize)
         textView.textColor = color
-        textView.drawsBackground = true
-        textView.backgroundColor = NSColor.white.withAlphaComponent(0.08)
+        textView.drawsBackground = false
+        textView.backgroundColor = .clear
         textView.insertionPointColor = color
         
         // Behavior
