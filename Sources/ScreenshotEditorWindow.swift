@@ -25,8 +25,11 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         }
 
         // Создаем стандартное окно с заголовком, чтобы рамка была видимой
+        let borderWidth: CGFloat = 15
+        let contentPadding: CGFloat = 8
+        let windowRect = NSRect(x: 0, y: 0, width: displayImage.size.width + borderWidth * 2 + contentPadding * 2, height: displayImage.size.height + borderWidth * 2 + contentPadding * 2)
         let window = EditorWindow(
-            contentRect: NSRect(x: 0, y: 0, width: displayImage.size.width, height: displayImage.size.height),
+            contentRect: windowRect,
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -34,10 +37,15 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
         window.title = "Редактор скриншота"
         window.titleVisibility = .visible
         window.titlebarAppearsTransparent = false
-        window.setContentSize(displayImage.size)
+        window.setContentSize(windowRect.size)
         window.backgroundColor = .windowBackgroundColor
         window.isMovableByWindowBackground = false
         window.center()
+        // Добавим толстую рамку вокруг окна
+        window.contentView?.wantsLayer = true
+        window.contentView?.layer?.borderWidth = borderWidth
+        window.contentView?.layer?.borderColor = NSColor.windowFrameColor.cgColor
+        window.contentView?.layer?.cornerRadius = 0
         
         self.init(window: window)
         
@@ -76,31 +84,26 @@ class ScreenshotEditorWindow: NSWindowController, EditorCanvasDelegate {
     }
     
     private func setupCanvasView(with image: NSImage) {
-        let containerView = NSView(frame: NSRect(origin: .zero, size: image.size))
-        containerView.wantsLayer = true
-        containerView.layer?.cornerRadius = frameCornerRadius
-        containerView.layer?.borderWidth = frameBorderWidth
-        containerView.layer?.borderColor = NSColor.black.withAlphaComponent(0.22).cgColor
-        containerView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.06).cgColor
-        containerView.layer?.shadowColor = NSColor.black.cgColor
-        containerView.layer?.shadowOpacity = 0.25
-        containerView.layer?.shadowRadius = 12
-        containerView.layer?.shadowOffset = CGSize(width: 0, height: -1)
+        // Контейнер с паддингом вокруг canvasView
+        let contentPadding: CGFloat = 3
+        let containerSize = NSSize(width: image.size.width + contentPadding * 2, height: image.size.height + contentPadding * 2)
+        let containerView = NSView(frame: NSRect(origin: .zero, size: containerSize))
 
         canvasView = EditorCanvasView(frame: NSRect(origin: .zero, size: image.size))
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         canvasView.screenshotImage = image
         canvasView.delegate = self
         canvasView.wantsLayer = true
-        canvasView.layer?.cornerRadius = frameCornerRadius
+        canvasView.layer?.cornerRadius = 0 // убираем скругление у скриншота
         canvasView.layer?.masksToBounds = true
 
         containerView.addSubview(canvasView)
+        // Используем автолейаут для равных паддингов
         NSLayoutConstraint.activate([
-            canvasView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            canvasView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            canvasView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            canvasView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            canvasView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: contentPadding),
+            canvasView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: contentPadding),
+            canvasView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -contentPadding),
+            canvasView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -contentPadding)
         ])
 
         window!.contentView = containerView
